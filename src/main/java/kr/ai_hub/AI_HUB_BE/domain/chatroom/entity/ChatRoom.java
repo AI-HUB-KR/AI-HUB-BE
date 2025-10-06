@@ -1,0 +1,48 @@
+package kr.ai_hub.AI_HUB_BE.domain.chatroom.entity;
+
+import jakarta.persistence.*;
+import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import lombok.*;
+import org.hibernate.annotations.UuidGenerator;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "chat_room")
+@EntityListeners(AuditingEntityListener.class)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ChatRoom {
+
+    @Id
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
+    @Column(name = "room_id", columnDefinition = "UUID")
+    private UUID roomId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_chat_room_user"))
+    private User user;
+
+    @Column(name = "title", length = 30, nullable = false)
+    private String title;
+
+    @Column(name = "coin_usage", precision = 20, scale = 10)
+    @Builder.Default
+    private BigDecimal coinUsage = BigDecimal.ZERO;
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+}
