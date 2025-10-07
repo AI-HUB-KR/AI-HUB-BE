@@ -54,3 +54,14 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+
+deployment:
+  address: ${DEPLOYMENT_ADDRESS:http://localhost:8080}
+  frontend:
+    redirect-url: ${FRONTEND_ADDRESS:http://localhost:3000}
+
+jwt:
+  secret: ${JWT_SECRET:default_jwt_secret_key}
+  expiration:
+    access: ${JWT_EXPIRATION_SECOND:7200}
+    refresh: ${JWT_REFRESH_EXPIRATION_SECOND:604800}
