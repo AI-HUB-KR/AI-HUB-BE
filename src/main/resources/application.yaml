@@ -57,7 +57,11 @@ spring:
 
 deployment:
   address: ${DEPLOYMENT_ADDRESS:http://localhost:8080}
+  frontend:
+    redirect-url: ${FRONTEND_ADDRESS:http://localhost:3000}
 
 jwt:
   secret: ${JWT_SECRET:default_jwt_secret_key}
-  expiration: ${JWT_EXPIRATION_MS:86400}
+  expiration:
+    access: ${JWT_EXPIRATION_SECOND:7200}
+    refresh: ${JWT_REFRESH_EXPIRATION_SECOND:604800}
