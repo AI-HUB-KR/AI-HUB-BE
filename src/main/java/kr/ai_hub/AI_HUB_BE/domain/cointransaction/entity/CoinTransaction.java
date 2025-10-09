@@ -16,9 +16,8 @@ import java.time.LocalDateTime;
 @Table(name = "coin_transaction")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class CoinTransaction {
 
