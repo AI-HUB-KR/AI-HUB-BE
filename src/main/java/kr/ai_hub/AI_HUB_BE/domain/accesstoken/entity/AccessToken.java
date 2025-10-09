@@ -52,8 +52,9 @@ public class AccessToken {
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "revoked_reason", length = 100)
-    private String revokedReason;
+    private TokenRevokeReason revokedReason;
 
     public void markUsed() {
         this.lastUsedAt = LocalDateTime.now();
@@ -62,7 +63,7 @@ public class AccessToken {
     public void revoke(TokenRevokeReason reason) {
         this.isRevoked = true;
         this.revokedAt = LocalDateTime.now();
-        this.revokedReason = reason.value();
+        this.revokedReason = reason;
     }
 
     public boolean isExpired() {
