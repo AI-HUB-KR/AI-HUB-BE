@@ -13,9 +13,8 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 @SQLRestriction("is_deleted = false")
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class User {
 

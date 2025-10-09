@@ -1,6 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.domain.refreshtoken.entity;
 
 import jakarta.persistence.*;
+import kr.ai_hub.AI_HUB_BE.domain.token.TokenRevokeReason;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -12,9 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "refresh_token")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class RefreshToken {
 
@@ -47,10 +47,10 @@ public class RefreshToken {
     @Column(name = "revoked_reason", length = 100)
     private String revokedReason;
 
-    public void revoke(String reason) {
+    public void revoke(TokenRevokeReason reason) {
         this.isRevoked = true;
         this.revokedAt = LocalDateTime.now();
-        this.revokedReason = reason;
+        this.revokedReason = reason.value();
     }
 
     public boolean isExpired() {

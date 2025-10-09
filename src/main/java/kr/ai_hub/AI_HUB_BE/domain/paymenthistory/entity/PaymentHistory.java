@@ -16,9 +16,8 @@ import java.util.Map;
 @Table(name = "payment_history")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class PaymentHistory {
 

@@ -16,9 +16,8 @@ import java.util.UUID;
 @Table(name = "chat_room")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class ChatRoom {
 

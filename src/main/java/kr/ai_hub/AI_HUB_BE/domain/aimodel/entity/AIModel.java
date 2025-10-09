@@ -13,9 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "ai_model")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class AIModel {
 
