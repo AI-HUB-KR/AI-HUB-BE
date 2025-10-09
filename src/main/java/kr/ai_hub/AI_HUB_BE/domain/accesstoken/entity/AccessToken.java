@@ -2,6 +2,7 @@ package kr.ai_hub.AI_HUB_BE.domain.accesstoken.entity;
 
 import jakarta.persistence.*;
 import kr.ai_hub.AI_HUB_BE.domain.refreshtoken.entity.RefreshToken;
+import kr.ai_hub.AI_HUB_BE.domain.token.TokenRevokeReason;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -13,9 +14,8 @@ import java.time.LocalDateTime;
 @Table(name = "access_token")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class AccessToken {
 
@@ -59,10 +59,10 @@ public class AccessToken {
         this.lastUsedAt = LocalDateTime.now();
     }
 
-    public void revoke(String reason) {
+    public void revoke(TokenRevokeReason reason) {
         this.isRevoked = true;
         this.revokedAt = LocalDateTime.now();
-        this.revokedReason = reason;
+        this.revokedReason = reason.value();
     }
 
     public boolean isExpired() {
