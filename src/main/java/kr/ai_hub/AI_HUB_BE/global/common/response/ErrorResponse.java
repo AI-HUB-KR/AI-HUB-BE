@@ -1,4 +1,4 @@
-package kr.ai_hub.AI_HUB_BE.global.response;
+package kr.ai_hub.AI_HUB_BE.global.common.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import kr.ai_hub.AI_HUB_BE.global.error.ErrorCode;
