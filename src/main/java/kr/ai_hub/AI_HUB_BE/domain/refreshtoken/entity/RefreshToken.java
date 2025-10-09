@@ -44,13 +44,14 @@ public class RefreshToken {
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "revoked_reason", length = 100)
-    private String revokedReason;
+    private TokenRevokeReason revokedReason;
 
     public void revoke(TokenRevokeReason reason) {
         this.isRevoked = true;
         this.revokedAt = LocalDateTime.now();
-        this.revokedReason = reason.value();
+        this.revokedReason = reason;
     }
 
     public boolean isExpired() {
