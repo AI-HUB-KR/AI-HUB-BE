@@ -1,0 +1,98 @@
+package kr.ai_hub.AI_HUB_BE.global.error;
+
+import kr.ai_hub.AI_HUB_BE.global.error.exception.BaseException;
+import kr.ai_hub.AI_HUB_BE.global.error.exception.IllegalSystemStateException;
+import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
+import kr.ai_hub.AI_HUB_BE.global.common.response.ErrorResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.stream.Collectors;
+
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    // 시스템 상태 예외 처리
+    @ExceptionHandler(IllegalSystemStateException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleIllegalSystemStateException(IllegalSystemStateException e) {
+        log.error("시스템 상태 예외 발생: {}", e.getMessage(), e);
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
+
+        return ResponseEntity
+                .status(e.getErrorCode().getStatus())
+                .body(response);
+    }
+
+    // 커스텀 예외 처리
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleBaseException(BaseException e) {
+        log.warn("비즈니스 예외 발생: {}", e.getMessage(), e);
+
+        ErrorCode errorCode = e.getErrorCode();
+        ApiResponse<ErrorResponse> response = ApiResponse.error(errorCode);
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(response);
+    }
+
+    // Validation 예외 처리 (@Valid 검증 실패)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleValidationException(MethodArgumentNotValidException e) {
+        log.warn("입력값 검증 실패: {}", e.getMessage());
+
+        String details = e.getBindingResult()
+                .getAllErrors()
+                .stream()
+                .map(error -> {
+                    if (error instanceof FieldError fieldError) {
+                        return fieldError.getField() + ": " + error.getDefaultMessage();
+                    }
+                    return error.getDefaultMessage();
+                })
+                .collect(Collectors.joining(", "));
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(ErrorCode.VALIDATION_ERROR, details);
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+
+    // 일반 예외 처리
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleException(Exception e) {
+        log.error("예상치 못한 예외 발생: {}", e.getMessage(), e);
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(response);
+    }
+
+    // IllegalArgumentException 처리
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleIllegalArgumentException(IllegalArgumentException e) {
+        log.warn("잘못된 인자 전달: {}", e.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                ErrorCode.VALIDATION_ERROR.name(),
+                ErrorCode.VALIDATION_ERROR.getMessage(),
+                e.getMessage()
+        );
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(errorResponse);
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+}
