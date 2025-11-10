@@ -5,6 +5,9 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.CustomOauth2User;
+import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +15,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -21,6 +23,8 @@ import java.util.*;
 @Component
 @RequiredArgsConstructor
 public class JwtTokenProvider {
+
+    private final UserRepository userRepository;
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -82,14 +86,27 @@ public class JwtTokenProvider {
 
     public Authentication getAuthentication(Claims claims) {
         String userId = claims.getSubject();
-        String role = claims.get("role", String.class);
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
 
-        UserDetails principal = org.springframework.security.core.userdetails.User.builder()
-                .username(userId)
-                .password("")
-                .authorities(authorities)
-                .build();
+        // DB에서 User 엔티티 조회
+        User user = userRepository.findById(Integer.parseInt(userId))
+                .orElseThrow(() -> new InvalidTokenException("존재하지 않는 사용자입니다"));
+
+        // CustomOauth2User 생성
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority(user.getRole().toString())
+        );
+
+        Map<String, Object> attributes = Map.of(
+                "userId", user.getUserId(),
+                "email", user.getEmail()
+        );
+
+        CustomOauth2User principal = new CustomOauth2User(
+                authorities,
+                attributes,
+                "userId",
+                user
+        );
 
         return new UsernamePasswordAuthenticationToken(principal, "", authorities);
     }
