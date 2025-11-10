@@ -58,4 +58,9 @@ public class User {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
     }
+
+    public void update(String username, String email) {
+        this.username = username;
+        this.email = email;
+    }
 }
