@@ -48,3 +48,6 @@ Thumbs.db
 claude_docs/
 CLAUDE_ANALYSIS.md
 CLAUDE_PLAN.md
+
+### Logs ###
+logs/
