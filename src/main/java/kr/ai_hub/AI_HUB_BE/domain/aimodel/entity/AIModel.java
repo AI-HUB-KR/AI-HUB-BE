@@ -32,11 +32,11 @@ public class AIModel {
     @Column(name = "display_explain", length = 100)
     private String displayExplain;
 
-    @Column(name = "input_price_per_1k", precision = 20, scale = 10, nullable = false)
-    private BigDecimal inputPricePer1k;
+    @Column(name = "input_price_per_1m", precision = 20, scale = 10, nullable = false)
+    private BigDecimal inputPricePer1m;
 
-    @Column(name = "output_price_per_1k", precision = 20, scale = 10, nullable = false)
-    private BigDecimal outputPricePer1k;
+    @Column(name = "output_price_per_1m", precision = 20, scale = 10, nullable = false)
+    private BigDecimal outputPricePer1m;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
