@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.stream.Collectors;
 
@@ -93,6 +94,29 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+
+    // ResponseStatusException 처리 (안전망 - 모든 ResponseStatusException은 커스텀 예외로 대체되어야 함)
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleResponseStatusException(ResponseStatusException e) {
+        log.warn("ResponseStatusException 발생 (커스텀 예외로 전환 필요): {}", e.getReason());
+
+        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                "RESPONSE_STATUS_EXCEPTION",
+                e.getReason() != null ? e.getReason() : "요청 처리 중 오류가 발생했습니다",
+                null
+        );
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(errorResponse);
+
+        return ResponseEntity
+                .status(status)
                 .body(response);
     }
 }

@@ -4,14 +4,13 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.WebUtils;
 
 import java.time.Duration;
@@ -53,9 +52,29 @@ public class CookieService {
         Cookie refreshTokenCookie = WebUtils.getCookie(request, "refreshToken");
         if (refreshTokenCookie == null || !StringUtils.hasText(refreshTokenCookie.getValue())) {
             log.warn("리프레시 토큰 쿠키가 없음");
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token cookie is missing");
+            throw new InvalidTokenException("Refresh token cookie is missing");
         }
 
         return refreshTokenCookie;
+    }
+
+    // 로그아웃 시 토큰 쿠키 삭제
+    public void removeTokenCookiesFromResponse(HttpServletResponse response) {
+        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", "")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .path("/api/token/refresh")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
     }
 }

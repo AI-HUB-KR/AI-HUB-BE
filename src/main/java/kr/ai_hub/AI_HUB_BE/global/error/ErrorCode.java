@@ -11,6 +11,7 @@ public enum ErrorCode {
     // 인증 전 (Public API) - 보안을 위해 일반화된 메시지
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "인증에 실패했습니다"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력값 검증에 실패했습니다"),
+    UNSUPPORTED_OAUTH2_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 OAuth2 공급자입니다"),
 
     // 인증 후 (Authenticated API) - 구체적인 메시지
     INSUFFICIENT_BALANCE(HttpStatus.BAD_REQUEST, "코인 잔액이 부족합니다"),
