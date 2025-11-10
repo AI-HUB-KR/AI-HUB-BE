@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import kr.ai_hub.AI_HUB_BE.application.auth.accesstoken.AccessTokenService;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -41,9 +43,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Authentication authentication = jwtTokenProvider.getAuthentication(claims);
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (InvalidTokenException | JwtException e) {
+            log.debug("토큰 검증 실패: {}", e.getMessage());
             SecurityContextHolder.clearContext();
-        } catch (IllegalArgumentException ignored) {
-
+        } catch (IllegalArgumentException e) {
+            log.debug("잘못된 토큰 형식: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);

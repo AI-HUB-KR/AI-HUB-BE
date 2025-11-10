@@ -11,14 +11,13 @@ import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtTokenProvider;
 import kr.ai_hub.AI_HUB_BE.application.auth.TokenHashService;
+import kr.ai_hub.AI_HUB_BE.global.error.exception.AuthenticationFailedException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.RefreshTokenInvalidException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -50,7 +49,7 @@ public class RefreshTokenService {
             claims = jwtTokenProvider.parseClaims(rawRefreshToken);
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("유효하지 않은 리프레시 토큰: {}", e.getMessage());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+            throw new RefreshTokenInvalidException("Invalid refresh token");
         }
 
         // 사용자 조회
@@ -60,7 +59,7 @@ public class RefreshTokenService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("사용자를 찾을 수 없음 - ID: {}", userId);
-                    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found");
+                    return new AuthenticationFailedException("User not found");
                 });
 
         // Refresh Token 검증
@@ -69,7 +68,7 @@ public class RefreshTokenService {
             storedToken = validateRefreshToken(user, rawRefreshToken);
         } catch (RefreshTokenInvalidException e) {
             log.warn("사용자 {} 리프레시 토큰 검증 실패: {}", userId, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, e.getMessage());
+            throw e;
         }
 
         // 기존 토큰 폐기
