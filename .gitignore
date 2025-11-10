@@ -43,3 +43,8 @@ out/
 Thumbs.db
 
 .env
+
+### Claude AI Analysis ###
+claude_docs/
+CLAUDE_ANALYSIS.md
+CLAUDE_PLAN.md
