@@ -19,6 +19,8 @@ public enum ErrorCode {
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다"),
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다"),
     MODEL_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 모델을 찾을 수 없습니다"),
+    WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다"),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 내역을 찾을 수 없습니다"),
     PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "결제에 실패했습니다"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다"),
