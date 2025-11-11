@@ -2,6 +2,7 @@ package kr.ai_hub.AI_HUB_BE.domain.message.repository;
 
 import kr.ai_hub.AI_HUB_BE.domain.chatroom.entity.ChatRoom;
 import kr.ai_hub.AI_HUB_BE.domain.message.entity.Message;
+import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,6 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     Optional<Message> findTopByChatRoomOrderByCreatedAtDesc(ChatRoom chatRoom);
 
     Page<Message> findByChatRoom(ChatRoom chatRoom, Pageable pageable);
+
+    List<Message> findByChatRoomUser(User user);
 }
