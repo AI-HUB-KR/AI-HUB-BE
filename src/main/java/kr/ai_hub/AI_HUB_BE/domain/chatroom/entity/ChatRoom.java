@@ -44,4 +44,8 @@ public class ChatRoom {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
 }
