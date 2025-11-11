@@ -11,12 +11,11 @@ import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
 import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
 import kr.ai_hub.AI_HUB_BE.domain.userwallet.repository.UserWalletRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.WalletNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +40,7 @@ public class DashboardService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final UserWalletRepository userWalletRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 모든 활성화된 AI 모델의 가격 정보를 조회합니다 (Public API).
@@ -58,7 +58,7 @@ public class DashboardService {
      * 현재 사용자의 월별 모델별 코인 사용량 통계를 조회합니다.
      */
     public MonthlyUsageResponse getMonthlyUsage(Integer year, Integer month) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("사용자 {} 월별 사용량 조회: {}/{}", userId, year, month);
 
         User user = userRepository.findById(userId)
@@ -164,7 +164,7 @@ public class DashboardService {
      * 현재 사용자의 코인 및 활동 통계를 요약합니다.
      */
     public UserStatsResponse getUserStats() {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("사용자 {} 통계 요약 조회", userId);
 
         User user = userRepository.findById(userId)
@@ -173,11 +173,11 @@ public class DashboardService {
         UserWallet wallet = userWalletRepository.findByUser(user)
                 .orElseThrow(() -> new WalletNotFoundException("지갑 정보를 찾을 수 없습니다"));
 
-        // 전체 메시지 수
-        long totalMessages = messageRepository.findByChatRoomUser(user).size();
+        // 전체 메시지 수 (최적화된 COUNT 쿼리 사용)
+        long totalMessages = messageRepository.countByUser(user);
 
-        // 전체 채팅방 수
-        long totalChatRooms = chatRoomRepository.findByUser(user).size();
+        // 전체 채팅방 수 (최적화된 COUNT 쿼리 사용)
+        long totalChatRooms = chatRoomRepository.countByUser(user);
 
         // 가장 많이 사용한 모델 계산
         List<CoinTransaction> allUsageTransactions = coinTransactionRepository.findByUserAndTransactionType(user, "usage");
@@ -239,22 +239,5 @@ public class DashboardService {
                 .last30DaysUsage(last30DaysUsage)
                 .memberSince(user.getCreatedAt().toInstant(ZoneOffset.UTC))
                 .build();
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
-        }
     }
 }

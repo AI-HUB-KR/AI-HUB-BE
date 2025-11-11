@@ -5,6 +5,7 @@ import kr.ai_hub.AI_HUB_BE.domain.paymenthistory.entity.PaymentHistory;
 import kr.ai_hub.AI_HUB_BE.domain.paymenthistory.repository.PaymentHistoryRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ForbiddenException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.PaymentNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
@@ -12,8 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,12 +24,13 @@ public class PaymentHistoryService {
 
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final UserRepository userRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 현재 사용자의 결제 내역을 페이지네이션하여 조회합니다.
      */
     public Page<PaymentResponse> getPayments(String status, Pageable pageable) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("사용자 {} 결제 내역 조회 (status={}, page={}, size={})",
                 userId, status, pageable.getPageNumber(), pageable.getPageSize());
 
@@ -51,7 +51,7 @@ public class PaymentHistoryService {
      * 특정 결제의 상세 정보를 조회합니다.
      */
     public PaymentResponse getPayment(Long paymentId) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("결제 {} 상세 조회 by 사용자 {}", paymentId, userId);
 
         PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
@@ -64,22 +64,5 @@ public class PaymentHistoryService {
         }
 
         return PaymentResponse.from(payment);
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
-        }
     }
 }

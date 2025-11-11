@@ -6,6 +6,8 @@ import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -26,4 +28,10 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     Page<Message> findByChatRoom(ChatRoom chatRoom, Pageable pageable);
 
     List<Message> findByChatRoomUser(User user);
+
+    /**
+     * 특정 사용자의 전체 메시지 수를 조회합니다 (최적화된 COUNT 쿼리).
+     */
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatRoom.user = :user")
+    long countByUser(@Param("user") User user);
 }

@@ -18,4 +18,9 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, UUID> {
     List<ChatRoom> findByUserOrderByCreatedAtDesc(User user);
 
     Page<ChatRoom> findByUser(User user, Pageable pageable);
+
+    /**
+     * 특정 사용자의 전체 채팅방 수를 조회합니다 (최적화된 COUNT 쿼리).
+     */
+    long countByUser(User user);
 }

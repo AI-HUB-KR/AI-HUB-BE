@@ -8,14 +8,13 @@ import kr.ai_hub.AI_HUB_BE.domain.aimodel.repository.AIModelRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.UserRole;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ForbiddenException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ModelNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +26,7 @@ public class AdminAIModelService {
 
     private final AIModelRepository aiModelRepository;
     private final UserRepository userRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 새로운 AI 모델을 등록합니다 (관리자 전용).
@@ -102,30 +102,13 @@ public class AdminAIModelService {
      * 현재 사용자가 관리자 권한을 가지고 있는지 검증합니다.
      */
     private void validateAdminRole() {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
 
         if (user.getRole() != UserRole.ROLE_ADMIN) {
             log.warn("관리자 권한 없음: userId={}, role={}", userId, user.getRole());
             throw new ForbiddenException("관리자 권한이 필요합니다");
-        }
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
         }
     }
 }

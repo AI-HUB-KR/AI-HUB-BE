@@ -12,6 +12,7 @@ import kr.ai_hub.AI_HUB_BE.domain.message.entity.Message;
 import kr.ai_hub.AI_HUB_BE.domain.message.repository.MessageRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ForbiddenException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ModelNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.RoomNotFoundException;
@@ -20,8 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,13 +37,14 @@ public class ChatRoomService {
     private final UserRepository userRepository;
     private final AIModelRepository aiModelRepository;
     private final MessageRepository messageRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 새로운 채팅방을 생성합니다.
      */
     @Transactional
     public ChatRoomResponse createChatRoom(CreateChatRoomRequest request) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.info("사용자 {} 채팅방 생성 요청: {}", userId, request.title());
 
         User user = userRepository.findById(userId)
@@ -74,7 +74,7 @@ public class ChatRoomService {
      * 현재 사용자의 채팅방 목록을 페이지네이션하여 조회합니다.
      */
     public Page<ChatRoomListItemResponse> getChatRooms(Pageable pageable) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("사용자 {} 채팅방 목록 조회 (page={}, size={})", userId, pageable.getPageNumber(), pageable.getPageSize());
 
         User user = userRepository.findById(userId)
@@ -101,7 +101,7 @@ public class ChatRoomService {
      * 특정 채팅방의 상세 정보를 조회합니다.
      */
     public ChatRoomResponse getChatRoom(UUID roomId) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("채팅방 {} 상세 조회 요청 by 사용자 {}", roomId, userId);
 
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
@@ -121,7 +121,7 @@ public class ChatRoomService {
      */
     @Transactional
     public ChatRoomResponse updateChatRoom(UUID roomId, UpdateChatRoomRequest request) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.info("채팅방 {} 제목 수정 요청 by 사용자 {}", roomId, userId);
 
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
@@ -144,7 +144,7 @@ public class ChatRoomService {
      */
     @Transactional
     public void deleteChatRoom(UUID roomId) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.info("채팅방 {} 삭제 요청 by 사용자 {}", roomId, userId);
 
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
@@ -158,22 +158,5 @@ public class ChatRoomService {
 
         chatRoomRepository.delete(chatRoom);
         log.info("채팅방 {} 삭제 완료", roomId);
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
-        }
     }
 }

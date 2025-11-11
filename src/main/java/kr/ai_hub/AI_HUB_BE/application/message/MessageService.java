@@ -7,16 +7,14 @@ import kr.ai_hub.AI_HUB_BE.domain.chatroom.repository.ChatRoomRepository;
 import kr.ai_hub.AI_HUB_BE.domain.message.entity.Message;
 import kr.ai_hub.AI_HUB_BE.domain.message.repository.MessageRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ForbiddenException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.MessageNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.RoomNotFoundException;
-import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,12 +29,13 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 특정 채팅방의 메시지 목록을 페이지네이션하여 조회합니다.
      */
     public Page<MessageListItemResponse> getMessages(UUID roomId, Pageable pageable) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("채팅방 {} 메시지 목록 조회 by 사용자 {} (page={}, size={})",
                 roomId, userId, pageable.getPageNumber(), pageable.getPageSize());
 
@@ -58,7 +57,7 @@ public class MessageService {
      * 특정 메시지의 상세 정보를 조회합니다.
      */
     public MessageResponse getMessage(UUID messageId) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("메시지 {} 상세 조회 by 사용자 {}", messageId, userId);
 
         Message message = messageRepository.findById(messageId)
@@ -71,22 +70,5 @@ public class MessageService {
         }
 
         return MessageResponse.from(message);
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
-        }
     }
 }

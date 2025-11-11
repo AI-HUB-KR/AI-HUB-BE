@@ -4,12 +4,11 @@ import kr.ai_hub.AI_HUB_BE.application.user.dto.UpdateUserRequest;
 import kr.ai_hub.AI_HUB_BE.application.user.dto.UserResponse;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 현재 인증된 사용자의 정보를 조회합니다.
      */
     public UserResponse getCurrentUser() {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("사용자 {} 정보 조회", userId);
 
         User user = userRepository.findById(userId)
@@ -39,7 +39,7 @@ public class UserService {
      */
     @Transactional
     public UserResponse updateCurrentUser(UpdateUserRequest request) {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.info("사용자 {} 정보 수정 요청", userId);
 
         User user = userRepository.findById(userId)
@@ -72,7 +72,7 @@ public class UserService {
      */
     @Transactional
     public void deleteCurrentUser() {
-        Integer userId = getCurrentUserId();
+        Integer userId = securityContextHelper.getCurrentUserId();
         log.info("사용자 {} 탈퇴 요청", userId);
 
         User user = userRepository.findById(userId)
@@ -80,22 +80,5 @@ public class UserService {
 
         user.softDelete();
         log.info("사용자 {} 탈퇴 완료", userId);
-    }
-
-    /**
-     * SecurityContext에서 현재 인증된 사용자의 ID를 가져옵니다.
-     */
-    private Integer getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("인증되지 않은 사용자입니다");
-        }
-
-        try {
-            return Integer.parseInt(authentication.getName());
-        } catch (NumberFormatException e) {
-            log.error("유효하지 않은 사용자 ID 형식: {}", authentication.getName());
-            throw new UserNotFoundException("유효하지 않은 사용자 ID입니다");
-        }
     }
 }
