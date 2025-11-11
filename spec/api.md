@@ -1275,11 +1275,11 @@ Authorization: Bearer <ACCESS_TOKEN>
         "modelName": "gpt-4",
         "displayName": "GPT-4",
         "displayExplain": "OpenAI의 최신 대화형 AI 모델",
-        "inputPricePer1k": 0.03,
-        "outputPricePer1k": 0.06,
-        "averagePricePer1k": 0.045,
+        "inputPricePer1m": 0.03,
+        "outputPricePer1m": 0.06,
         "isActive": true,
-        "createdAt": "2025-01-01T00:00:00Z"
+        "createdAt": "2025-01-01T00:00:00Z",
+        "updatedAt": "2025-01-01T00:00:00Z"
       }
     ],
     "timestamp": "2025-01-01T00:00:00Z"
@@ -1294,11 +1294,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 | detail[].modelName | string | 내부 모델 식별자 |
 | detail[].displayName | string | 사용자 표시 이름 |
 | detail[].displayExplain | string | 모델 설명 |
-| detail[].inputPricePer1k | number | 입력 1k 토큰당 가격 |
-| detail[].outputPricePer1k | number | 출력 1k 토큰당 가격 |
-| detail[].averagePricePer1k | number | 평균 가격 |
+| detail[].inputPricePer1m | number | 입력 1m 토큰당 가격 |
+| detail[].outputPricePer1m | number | 출력 1m 토큰당 가격 |
 | detail[].isActive | boolean | 활성화 여부 |
-| detail[].createdAt | string | 생성 시각 |
+| detail[].createdAt | string | 생성 시각 (ISO 8601) |
+| detail[].updatedAt | string | 수정 시각 (ISO 8601) |
 
 **오류 응답 예시**
 - **503 Service Unavailable**: 가격 데이터 동기화 실패
@@ -1335,8 +1335,8 @@ Authorization: Bearer <ACCESS_TOKEN>
       "modelName": "gpt-4",
       "displayName": "GPT-4",
       "displayExplain": "OpenAI의 최신 대화형 AI 모델",
-      "inputPricePer1k": 0.03,
-      "outputPricePer1k": 0.06,
+      "inputPricePer1m": 0.03,
+      "outputPricePer1m": 0.06,
       "isActive": true,
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
@@ -1353,11 +1353,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 | detail.modelName | string | 내부 모델 식별자 |
 | detail.displayName | string | 사용자 표시 이름 |
 | detail.displayExplain | string | 모델 설명 |
-| detail.inputPricePer1k | number | 입력 1k 토큰당 가격 |
-| detail.outputPricePer1k | number | 출력 1k 토큰당 가격 |
+| detail.inputPricePer1m | number | 입력 1m 토큰당 가격 |
+| detail.outputPricePer1m | number | 출력 1m 토큰당 가격 |
 | detail.isActive | boolean | 활성화 여부 |
-| detail.createdAt | string | 생성 시각 |
-| detail.updatedAt | string | 수정 시각 |
+| detail.createdAt | string | 생성 시각 (ISO 8601) |
+| detail.updatedAt | string | 수정 시각 (ISO 8601) |
 
 **오류 응답 예시**
 - **404 Not Found**: 모델 없음
@@ -1390,8 +1390,8 @@ Content-Type: application/json
   "modelName": "gpt-4-turbo",
   "displayName": "GPT-4 Turbo",
   "displayExplain": "더 빠르고 저렴한 GPT-4",
-  "inputPricePer1k": 0.01,
-  "outputPricePer1k": 0.03,
+  "inputPricePer1m": 0.01,
+  "outputPricePer1m": 0.03,
   "isActive": true
 }
 ```
@@ -1403,8 +1403,8 @@ Content-Type: application/json
 | modelName | string | ✅ | 시스템 내부 모델 식별자 | 소문자, 하이픈 허용 |
 | displayName | string | ✅ | 프런트 표시 이름 | 최대 30자 |
 | displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1k | number | ✅ | 입력 1k 토큰당 USD 가격 | 0 이상 |
-| outputPricePer1k | number | ✅ | 출력 1k 토큰당 USD 가격 | 0 이상 |
+| inputPricePer1m | number | ✅ | 입력 1m 토큰당 USD 가격 | 0 이상 |
+| outputPricePer1m | number | ✅ | 출력 1m 토큰당 USD 가격 | 0 이상 |
 | isActive | boolean | ✅ | 활성화 여부 | - |
 
 **성공 응답**
@@ -1417,8 +1417,8 @@ Content-Type: application/json
       "modelName": "gpt-4-turbo",
       "displayName": "GPT-4 Turbo",
       "displayExplain": "더 빠르고 저렴한 GPT-4",
-      "inputPricePer1k": 0.01,
-      "outputPricePer1k": 0.03,
+      "inputPricePer1m": 0.01,
+      "outputPricePer1m": 0.03,
       "isActive": true,
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
@@ -1477,8 +1477,8 @@ Content-Type: application/json
 {
   "displayName": "GPT-4 Turbo",
   "displayExplain": "업데이트된 설명",
-  "inputPricePer1k": 0.01,
-  "outputPricePer1k": 0.03,
+  "inputPricePer1m": 0.01,
+  "outputPricePer1m": 0.03,
   "isActive": true
 }
 ```
@@ -1489,8 +1489,8 @@ Content-Type: application/json
 |------|------|------|------|----------|
 | displayName | string | ❌ | 사용자 표시 이름 | 최대 30자 |
 | displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1k | number | ❌ | 입력 1k 토큰당 가격 | 0 이상 |
-| outputPricePer1k | number | ❌ | 출력 1k 토큰당 가격 | 0 이상 |
+| inputPricePer1m | number | ❌ | 입력 1m 토큰당 가격 | 0 이상 |
+| outputPricePer1m | number | ❌ | 출력 1m 토큰당 가격 | 0 이상 |
 | isActive | boolean | ❌ | 활성화 여부 | - |
 
 **성공 응답**
@@ -1503,8 +1503,8 @@ Content-Type: application/json
       "modelName": "gpt-4",
       "displayName": "GPT-4 Turbo",
       "displayExplain": "업데이트된 설명",
-      "inputPricePer1k": 0.01,
-      "outputPricePer1k": 0.03,
+      "inputPricePer1m": 0.01,
+      "outputPricePer1m": 0.03,
       "isActive": true,
       "createdAt": "2024-12-01T00:00:00Z",
       "updatedAt": "2025-01-02T00:00:00Z"
@@ -1535,7 +1535,7 @@ Content-Type: application/json
     "detail": {
       "code": "VALIDATION_ERROR",
       "message": "가격은 0 이상이어야 합니다.",
-      "details": "inputPricePer1k=-0.1"
+      "details": "inputPricePer1m=-0.1"
     },
     "timestamp": "2025-01-01T00:00:00Z"
   }
@@ -2317,7 +2317,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 #### 모델별 가격 대시보드
 - **Method**: GET `/api/v1/dashboard/models/pricing`
-- **설명**: 모든 활성화된 AI 모델의 1,000토큰당 USD 가격 정보를 조회합니다.
+- **설명**: 모든 활성화된 AI 모델의 1,000,000토큰당 USD 가격 정보를 조회합니다.
 - **인증**: Public
 
 **성공 응답**
@@ -2330,9 +2330,8 @@ Authorization: Bearer <ACCESS_TOKEN>
         "modelId": 1,
         "modelName": "gpt-4",
         "displayName": "GPT-4",
-        "inputPricePer1k": 0.03,
-        "outputPricePer1k": 0.06,
-        "averagePricePer1k": 0.045,
+        "inputPricePer1m": 0.03,
+        "outputPricePer1m": 0.06,
         "isActive": true
       }
     ],
