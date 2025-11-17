@@ -2,6 +2,11 @@ spring:
   application:
     name: AI-HUB-BE
 
+  # Virtual Threads Configuration (Java 21+)
+  threads:
+    virtual:
+      enabled: true
+
   # DataSource Configuration
   # 환경변수가 없으면 H2 인메모리 DB를 PostgreSQL 모드로 사용
   datasource:

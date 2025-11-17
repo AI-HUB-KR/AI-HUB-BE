@@ -23,7 +23,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -105,12 +103,12 @@ public class MessageService {
 
     /**
      * 메시지를 전송하고 AI 응답을 SSE로 스트리밍합니다.
+     * Virtual Threads가 I/O 블로킹을 자동으로 처리합니다.
      *
      * @param roomId  채팅방 ID
      * @param request 메시지 전송 요청
      * @param emitter SSE Emitter
      */
-    @Async
     public void sendMessage(UUID roomId, SendMessageRequest request, SseEmitter emitter) {
         try {
             log.info("메시지 전송 시작: roomId={}, modelId={}", roomId, request.modelId());
@@ -143,10 +141,10 @@ public class MessageService {
             // SSE 시작 알림
             emitter.send(SseEmitter.event().name("started").data("Message sending started"));
 
-            // 3. AI 서버 SSE 스트리밍
-            AtomicReference<String> aiResponseId = new AtomicReference<>();
+            // 3. AI 서버 SSE 스트리밍 (동기 방식)
+            String aiResponseId = null;
             StringBuilder fullContent = new StringBuilder();
-            AtomicReference<AiUsage> usage = new AtomicReference<>();
+            AiUsage usage = null;
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("message", request.message());
@@ -158,86 +156,78 @@ public class MessageService {
                 requestBody.put("previous_response_id", request.previousResponseId());
             }
 
-            // AI 서버와 SSE 통신
-            aiServerWebClient.post()
-                    .uri("/ai/chat")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToFlux(String.class)
-                    .doOnNext(line -> {
-                        try {
-                            if (line.startsWith("data: ")) {
-                                String jsonData = line.substring(6);
-                                SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+            // AI 서버와 SSE 통신 (blocking stream으로 변환)
+            try {
+                var stream = aiServerWebClient.post()
+                        .uri("/ai/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToFlux(String.class)
+                        .toStream();  // Flux를 blocking Stream으로 변환
 
-                                switch (event.type()) {
-                                    case "response.created":
-                                        if (event.response() != null) {
-                                            aiResponseId.set(event.response().id());
-                                            log.debug("AI 응답 생성: id={}", aiResponseId.get());
-                                        }
-                                        break;
+                // Stream을 순회하며 SSE 이벤트 처리
+                for (String line : (Iterable<String>) stream::iterator) {
+                    if (line.startsWith("data: ")) {
+                        String jsonData = line.substring(6);
+                        SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
 
-                                    case "response.output_text.delta":
-                                        if (event.delta() != null) {
-                                            fullContent.append(event.delta());
-                                            // 클라이언트에게 delta 전달
-                                            emitter.send(SseEmitter.event()
-                                                    .name("delta")
-                                                    .data(event.delta()));
-                                        }
-                                        break;
-
-                                    case "response.completed":
-                                        if (event.response() != null) {
-                                            usage.set(event.response().usage());
-                                            log.info("AI 응답 완료: tokens={}", usage.get().totalTokens());
-                                        }
-                                        break;
-
-                                    case "error":
-                                        if (event.error() != null) {
-                                            log.error("AI 서버 에러: {}", event.error().message());
-                                            throw new AIServerException(event.error().message());
-                                        }
-                                        break;
+                        switch (event.type()) {
+                            case "response.created":
+                                if (event.response() != null) {
+                                    aiResponseId = event.response().id();
+                                    log.debug("AI 응답 생성: id={}", aiResponseId);
                                 }
-                            }
-                        } catch (IOException e) {
-                            log.error("SSE 이벤트 파싱 에러: {}", e.getMessage());
-                            throw new RuntimeException(e);
+                                break;
+
+                            case "response.output_text.delta":
+                                if (event.delta() != null) {
+                                    fullContent.append(event.delta());
+                                    // 클라이언트에게 delta 전달
+                                    emitter.send(SseEmitter.event()
+                                            .name("delta")
+                                            .data(event.delta()));
+                                }
+                                break;
+
+                            case "response.completed":
+                                if (event.response() != null) {
+                                    usage = event.response().usage();
+                                    log.info("AI 응답 완료: tokens={}", usage.totalTokens());
+                                }
+                                break;
+
+                            case "error":
+                                if (event.error() != null) {
+                                    log.error("AI 서버 에러: {}", event.error().message());
+                                    throw new AIServerException(event.error().message());
+                                }
+                                break;
                         }
-                    })
-                    .doOnComplete(() -> {
-                        try {
-                            // 4. 코인 계산 및 차감, 메시지 저장
-                            processCompletedResponse(
-                                    chatRoom, aiModel, user, wallet, userMessage,
-                                    aiResponseId.get(), fullContent.toString(), usage.get()
-                            );
+                    }
+                }
 
-                            // 5. 완료 이벤트 전달
-                            Map<String, Object> completedData = new HashMap<>();
-                            completedData.put("userMessageId", userMessage.getMessageId());
-                            completedData.put("aiResponseId", aiResponseId.get());
-                            completedData.put("inputTokens", usage.get().inputTokens());
-                            completedData.put("outputTokens", usage.get().outputTokens());
-                            emitter.send(SseEmitter.event().name("completed").data(completedData));
-                            emitter.complete();
+                // 4. 코인 계산 및 차감, 메시지 저장
+                processCompletedResponse(
+                        chatRoom, aiModel, user, wallet, userMessage,
+                        aiResponseId, fullContent.toString(), usage
+                );
 
-                            log.info("메시지 전송 완료: roomId={}", roomId);
+                // 5. 완료 이벤트 전달
+                Map<String, Object> completedData = new HashMap<>();
+                completedData.put("userMessageId", userMessage.getMessageId());
+                completedData.put("aiResponseId", aiResponseId);
+                completedData.put("inputTokens", usage.inputTokens());
+                completedData.put("outputTokens", usage.outputTokens());
+                emitter.send(SseEmitter.event().name("completed").data(completedData));
+                emitter.complete();
 
-                        } catch (Exception e) {
-                            log.error("응답 처리 중 에러: {}", e.getMessage(), e);
-                            emitter.completeWithError(e);
-                        }
-                    })
-                    .doOnError(error -> {
-                        log.error("AI 서버 통신 에러: {}", error.getMessage(), error);
-                        emitter.completeWithError(new AIServerException("AI 서버 통신 실패: " + error.getMessage()));
-                    })
-                    .subscribe();
+                log.info("메시지 전송 완료: roomId={}", roomId);
+
+            } catch (Exception e) {
+                log.error("AI 서버 통신 에러: {}", e.getMessage(), e);
+                throw new AIServerException("AI 서버 통신 실패: " + e.getMessage(), e);
+            }
 
         } catch (Exception e) {
             log.error("메시지 전송 중 에러: {}", e.getMessage(), e);
