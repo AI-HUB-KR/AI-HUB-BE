@@ -2,7 +2,7 @@
 
 > 이 문서는 코드베이스 탐색 시 빠르게 필요한 파일을 찾을 수 있도록 작성된 구조 가이드입니다.
 >
-> 마지막 업데이트: 2025-11-11
+> 마지막 업데이트: 2025-11-17
 
 ---
 
@@ -26,7 +26,7 @@
 **패키지 전략**: Package by Feature (도메인별 패키지 구조)
 
 ### 통계
-- **전체 Java 파일**: 101개
+- **전체 Java 파일**: 102개
 - **Entity**: 10개
 - **Repository**: 9개
 - **Service**: 14개
@@ -80,10 +80,11 @@ controller/
 ├── auth/
 │   ├── AuthController.java                      # OAuth2 로그인 API
 │   └── TokenController.java                     # 토큰 갱신 API
-├── chatroom/ChatRoomController.java             # 채팅방 CRUD API
+├── chat/
+│   ├── ChatRoomController.java                  # 채팅방 CRUD API
+│   └── ChatMessageController.java               # 메시지 조회 API
 ├── cointransaction/CoinTransactionController.java # 코인 거래 내역 API
 ├── dashboard/DashboardController.java           # 대시보드 통계 API
-├── message/MessageController.java               # 메시지 조회 API
 ├── paymenthistory/PaymentHistoryController.java # 결제 내역 API
 ├── user/UserController.java                     # 사용자 정보 API
 └── userwallet/UserWalletController.java         # 지갑 조회 API
@@ -217,8 +218,8 @@ global/
 │   └── response/ApiResponse.java                # 공통 API 응답 래퍼
 ├── config/
 │   ├── JpaConfig.java                           # JPA 설정 (Auditing)
-│   ├── SecurityConfig.java                      # Spring Security 설정
-│   └── SwaggerConfig.java                       # Swagger/OpenAPI 설정
+│   ├── OpenApiConfig.java                       # Swagger/OpenAPI 설정
+│   └── SecurityConfig.java                      # Spring Security 설정
 └── error/
     ├── ErrorCode.java                           # 에러 코드 Enum
     ├── GlobalExceptionHandler.java              # 전역 예외 핸들러
@@ -290,7 +291,7 @@ API Endpoints:
 
 ### ChatRoom (채팅방)
 ```
-Controller:  controller/chatroom/ChatRoomController.java
+Controller:  controller/chat/ChatRoomController.java
 Service:     application/chatroom/ChatRoomService.java
 Entity:      domain/chatroom/entity/ChatRoom.java
 Repository:  domain/chatroom/repository/ChatRoomRepository.java
@@ -310,7 +311,7 @@ API Endpoints:
 
 ### Message (메시지)
 ```
-Controller:  controller/message/MessageController.java
+Controller:  controller/chat/ChatMessageController.java
 Service:     application/message/MessageService.java
 Entity:      domain/message/entity/Message.java
 Repository:  domain/message/repository/MessageRepository.java
@@ -319,7 +320,7 @@ DTOs:
   - application/message/dto/MessageListItemResponse.java
 
 API Endpoints:
-  - GET /api/v1/chat-rooms/{roomId}/messages  # 메시지 목록
+  - GET /api/v1/messages/page/{roomId}        # 메시지 목록 (페이지네이션)
   - GET /api/v1/messages/{messageId}          # 메시지 상세
 ```
 
@@ -429,8 +430,8 @@ API 응답 래퍼:          global/common/response/ApiResponse.java
 ### 설정 클래스
 ```
 JPA 설정:              global/config/JpaConfig.java
+OpenAPI/Swagger 설정:  global/config/OpenApiConfig.java
 Security 설정:         global/config/SecurityConfig.java
-Swagger 설정:          global/config/SwaggerConfig.java
 ```
 
 ### 애플리케이션 진입점
@@ -633,6 +634,15 @@ Exception:    global/error/exception/{Name}Exception.java
 
 ## 📌 최근 주요 변경사항
 
+### 2025-11-17
+- **컨트롤러 구조 개선**: 채팅 관련 컨트롤러를 `chat/` 패키지로 통합
+  - `ChatRoomController`, `ChatMessageController`를 단일 패키지에서 관리
+- **Swagger/OpenAPI 추가**: API 문서 자동 생성 설정 (springdoc-openapi-starter-webmvc-ui:2.8.13)
+  - OpenAPI UI 접근: http://localhost:8080/swagger-ui.html
+  - OpenAPI 스펙: http://localhost:8080/v3/api-docs
+- **메시지 엔드포인트 변경**: `GET /api/v1/messages/page/{roomId}` 경로 변경
+- **Security 설정 개선**: Swagger 경로 및 OPTIONS preflight 요청 허용
+
 ### 2025-11-11
 - **SecurityContextHelper 추가**: 8개 서비스에서 중복되던 `getCurrentUserId()` 로직 공통화
 - **Count 쿼리 최적화**: MessageRepository, ChatRoomRepository에 count 메서드 추가
@@ -642,6 +652,6 @@ Exception:    global/error/exception/{Name}Exception.java
 
 ---
 
-**문서 버전**: 1.0.0
+**문서 버전**: 1.1.0
 **작성자**: Claude Code
-**마지막 업데이트**: 2025-11-11
+**마지막 업데이트**: 2025-11-17
