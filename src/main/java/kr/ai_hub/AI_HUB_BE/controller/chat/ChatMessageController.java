@@ -1,9 +1,11 @@
 package kr.ai_hub.AI_HUB_BE.controller.chat;
 
+import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.message.MessageService;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.FileUploadResponse;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.MessageListItemResponse;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.MessageResponse;
+import kr.ai_hub.AI_HUB_BE.application.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,9 +14,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
@@ -25,6 +29,30 @@ import java.util.UUID;
 public class ChatMessageController {
 
     private final MessageService messageService;
+
+    /**
+     * 메시지 전송 및 SSE 스트리밍 API
+     * <p>
+     * 사용자 메시지를 AI 서버로 전송하고, AI 응답을 SSE 스트리밍으로 반환합니다.
+     * - User 메시지 저장
+     * - AI 서버와 SSE 통신
+     * - 실시간 증분 텍스트 전달
+     * - 코인 차감 및 Assistant 메시지 저장
+     * </p>
+     */
+    @PostMapping(value = "/send/{roomId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter sendMessage(
+            @PathVariable UUID roomId,
+            @Valid @RequestBody SendMessageRequest request) {
+        log.info("메시지 전송 API 호출: roomId={}, modelId={}", roomId, request.modelId());
+
+        SseEmitter emitter = new SseEmitter(5 * 60 * 1000L); // 5분 타임아웃
+
+        // 비동기로 메시지 전송 처리
+        messageService.sendMessage(roomId, request, emitter);
+
+        return emitter;
+    }
 
     /**
      * 파일 업로드 API
