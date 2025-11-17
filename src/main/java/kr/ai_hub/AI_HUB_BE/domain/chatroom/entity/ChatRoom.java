@@ -48,4 +48,15 @@ public class ChatRoom {
     public void updateTitle(String title) {
         this.title = title;
     }
+
+    /**
+     * 코인 사용량을 증가시킵니다.
+     *
+     * @param amount 증가시킬 코인 양
+     */
+    public void addCoinUsage(BigDecimal amount) {
+        if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+            this.coinUsage = this.coinUsage.add(amount);
+        }
+    }
 }

@@ -1,36 +1,47 @@
 package kr.ai_hub.AI_HUB_BE.application.message;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.*;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.entity.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.repository.AIModelRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chatroom.entity.ChatRoom;
 import kr.ai_hub.AI_HUB_BE.domain.chatroom.repository.ChatRoomRepository;
+import kr.ai_hub.AI_HUB_BE.domain.cointransaction.entity.CoinTransaction;
+import kr.ai_hub.AI_HUB_BE.domain.cointransaction.repository.CoinTransactionRepository;
 import kr.ai_hub.AI_HUB_BE.domain.message.entity.Message;
+import kr.ai_hub.AI_HUB_BE.domain.message.entity.MessageRole;
 import kr.ai_hub.AI_HUB_BE.domain.message.repository.MessageRepository;
+import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
+import kr.ai_hub.AI_HUB_BE.domain.userwallet.repository.UserWalletRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -42,8 +53,11 @@ public class MessageService {
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
     private final AIModelRepository aiModelRepository;
+    private final UserWalletRepository userWalletRepository;
+    private final CoinTransactionRepository coinTransactionRepository;
     private final SecurityContextHelper securityContextHelper;
     private final WebClient aiServerWebClient;
+    private final ObjectMapper objectMapper;
 
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -87,6 +101,238 @@ public class MessageService {
         }
 
         return MessageResponse.from(message);
+    }
+
+    /**
+     * 메시지를 전송하고 AI 응답을 SSE로 스트리밍합니다.
+     *
+     * @param roomId  채팅방 ID
+     * @param request 메시지 전송 요청
+     * @param emitter SSE Emitter
+     */
+    @Async
+    public void sendMessage(UUID roomId, SendMessageRequest request, SseEmitter emitter) {
+        try {
+            log.info("메시지 전송 시작: roomId={}, modelId={}", roomId, request.modelId());
+
+            // 1. 사전 검증
+            Integer userId = securityContextHelper.getCurrentUserId();
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+
+            ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                    .orElseThrow(() -> new RoomNotFoundException("채팅방을 찾을 수 없습니다: " + roomId));
+
+            // 권한 확인
+            if (!chatRoom.getUser().getUserId().equals(userId)) {
+                log.warn("채팅방 접근 권한 없음: roomId={}, userId={}", roomId, userId);
+                emitter.completeWithError(new ForbiddenException("해당 채팅방에 접근할 권한이 없습니다"));
+                return;
+            }
+
+            AIModel aiModel = aiModelRepository.findById(request.modelId())
+                    .orElseThrow(() -> new ModelNotFoundException("AI 모델을 찾을 수 없습니다: " + request.modelId()));
+
+            UserWallet wallet = userWalletRepository.findByUser(user)
+                    .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
+
+            // 2. User 메시지 저장 (별도 트랜잭션)
+            Message userMessage = saveUserMessage(chatRoom, aiModel, request);
+            log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
+
+            // SSE 시작 알림
+            emitter.send(SseEmitter.event().name("started").data("Message sending started"));
+
+            // 3. AI 서버 SSE 스트리밍
+            AtomicReference<String> aiResponseId = new AtomicReference<>();
+            StringBuilder fullContent = new StringBuilder();
+            AtomicReference<AiUsage> usage = new AtomicReference<>();
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("message", request.message());
+            requestBody.put("model", aiModel.getModelName());
+            if (request.fileId() != null) {
+                requestBody.put("file_id", request.fileId());
+            }
+            if (request.previousResponseId() != null) {
+                requestBody.put("previous_response_id", request.previousResponseId());
+            }
+
+            // AI 서버와 SSE 통신
+            aiServerWebClient.post()
+                    .uri("/ai/chat")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .doOnNext(line -> {
+                        try {
+                            if (line.startsWith("data: ")) {
+                                String jsonData = line.substring(6);
+                                SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+
+                                switch (event.type()) {
+                                    case "response.created":
+                                        if (event.response() != null) {
+                                            aiResponseId.set(event.response().id());
+                                            log.debug("AI 응답 생성: id={}", aiResponseId.get());
+                                        }
+                                        break;
+
+                                    case "response.output_text.delta":
+                                        if (event.delta() != null) {
+                                            fullContent.append(event.delta());
+                                            // 클라이언트에게 delta 전달
+                                            emitter.send(SseEmitter.event()
+                                                    .name("delta")
+                                                    .data(event.delta()));
+                                        }
+                                        break;
+
+                                    case "response.completed":
+                                        if (event.response() != null) {
+                                            usage.set(event.response().usage());
+                                            log.info("AI 응답 완료: tokens={}", usage.get().totalTokens());
+                                        }
+                                        break;
+
+                                    case "error":
+                                        if (event.error() != null) {
+                                            log.error("AI 서버 에러: {}", event.error().message());
+                                            throw new AIServerException(event.error().message());
+                                        }
+                                        break;
+                                }
+                            }
+                        } catch (IOException e) {
+                            log.error("SSE 이벤트 파싱 에러: {}", e.getMessage());
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .doOnComplete(() -> {
+                        try {
+                            // 4. 코인 계산 및 차감, 메시지 저장
+                            processCompletedResponse(
+                                    chatRoom, aiModel, user, wallet, userMessage,
+                                    aiResponseId.get(), fullContent.toString(), usage.get()
+                            );
+
+                            // 5. 완료 이벤트 전달
+                            Map<String, Object> completedData = new HashMap<>();
+                            completedData.put("userMessageId", userMessage.getMessageId());
+                            completedData.put("aiResponseId", aiResponseId.get());
+                            completedData.put("inputTokens", usage.get().inputTokens());
+                            completedData.put("outputTokens", usage.get().outputTokens());
+                            emitter.send(SseEmitter.event().name("completed").data(completedData));
+                            emitter.complete();
+
+                            log.info("메시지 전송 완료: roomId={}", roomId);
+
+                        } catch (Exception e) {
+                            log.error("응답 처리 중 에러: {}", e.getMessage(), e);
+                            emitter.completeWithError(e);
+                        }
+                    })
+                    .doOnError(error -> {
+                        log.error("AI 서버 통신 에러: {}", error.getMessage(), error);
+                        emitter.completeWithError(new AIServerException("AI 서버 통신 실패: " + error.getMessage()));
+                    })
+                    .subscribe();
+
+        } catch (Exception e) {
+            log.error("메시지 전송 중 에러: {}", e.getMessage(), e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    /**
+     * User 메시지를 저장합니다 (별도 트랜잭션).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected Message saveUserMessage(ChatRoom chatRoom, AIModel aiModel, SendMessageRequest request) {
+        Message userMessage = Message.builder()
+                .chatRoom(chatRoom)
+                .role(MessageRole.USER)
+                .content(request.message())
+                .fileUrl(request.fileId())
+                .aiModel(aiModel)
+                .build();
+
+        return messageRepository.save(userMessage);
+    }
+
+    /**
+     * AI 응답 완료 후 코인 차감 및 메시지 저장을 처리합니다.
+     */
+    @Transactional
+    protected void processCompletedResponse(
+            ChatRoom chatRoom, AIModel aiModel, User user, UserWallet wallet,
+            Message userMessage, String aiResponseId, String fullContent, AiUsage usage) {
+
+        // 코인 계산
+        BigDecimal inputCoin = calculateCoin(usage.inputTokens(), aiModel.getInputPricePer1m());
+        BigDecimal outputCoin = calculateCoin(usage.outputTokens(), aiModel.getOutputPricePer1m());
+        BigDecimal totalCoin = inputCoin.add(outputCoin);
+
+        log.info("코인 계산: input={}, output={}, total={}", inputCoin, outputCoin, totalCoin);
+
+        // 코인 차감
+        wallet.deductBalance(totalCoin);
+
+        // Assistant 메시지 저장
+        Message assistantMessage = Message.builder()
+                .chatRoom(chatRoom)
+                .role(MessageRole.ASSISTANT)
+                .content(fullContent)
+                .aiModel(aiModel)
+                .tokenCount(BigDecimal.valueOf(usage.outputTokens()))
+                .coinCount(outputCoin)
+                .responseId(aiResponseId)
+                .build();
+        messageRepository.save(assistantMessage);
+
+        // User 메시지 업데이트
+        userMessage.updateResponseId(aiResponseId);
+        userMessage.updateTokenAndCoin(
+                BigDecimal.valueOf(usage.inputTokens()),
+                inputCoin
+        );
+
+        // ChatRoom 코인 사용량 업데이트
+        chatRoom.addCoinUsage(totalCoin);
+
+        // CoinTransaction 기록
+        CoinTransaction transaction = CoinTransaction.builder()
+                .user(user)
+                .chatRoom(chatRoom)
+                .message(assistantMessage)
+                .transactionType("AI_USAGE")
+                .amount(totalCoin.negate()) // 차감이므로 음수
+                .balanceAfter(wallet.getBalance())
+                .description(String.format("AI 모델 사용: %s (입력: %d토큰, 출력: %d토큰)",
+                        aiModel.getModelName(), usage.inputTokens(), usage.outputTokens()))
+                .aiModel(aiModel)
+                .build();
+        coinTransactionRepository.save(transaction);
+
+        log.info("코인 차감 및 메시지 저장 완료: totalCoin={}, balance={}", totalCoin, wallet.getBalance());
+    }
+
+    /**
+     * 토큰량으로부터 코인을 계산합니다.
+     * 공식: (토큰량 / 1,000,000) * 모델_가격_per_1M
+     */
+    private BigDecimal calculateCoin(Integer tokens, BigDecimal pricePer1M) {
+        if (tokens == null || tokens == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal tokenAmount = BigDecimal.valueOf(tokens);
+        BigDecimal oneMillium = BigDecimal.valueOf(1_000_000);
+
+        return tokenAmount.divide(oneMillium, 10, RoundingMode.HALF_UP)
+                .multiply(pricePer1M)
+                .setScale(10, RoundingMode.HALF_UP);
     }
 
     /**

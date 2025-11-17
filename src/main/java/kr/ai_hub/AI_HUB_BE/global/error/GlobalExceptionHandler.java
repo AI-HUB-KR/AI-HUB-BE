@@ -1,5 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.global.error;
 
+import kr.ai_hub.AI_HUB_BE.global.error.exception.AIServerException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.BaseException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.IllegalSystemStateException;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
@@ -18,6 +19,18 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // AI 서버 통신 예외 처리
+    @ExceptionHandler(AIServerException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleAIServerException(AIServerException e) {
+        log.error("AI 서버 통신 예외 발생: {}", e.getMessage(), e);
+
+        ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
+
+        return ResponseEntity
+                .status(e.getErrorCode().getStatus())
+                .body(response);
+    }
 
     // 시스템 상태 예외 처리
     @ExceptionHandler(IllegalSystemStateException.class)
