@@ -26,7 +26,7 @@ public record MessageResponse(
         return MessageResponse.builder()
                 .messageId(message.getMessageId().toString())
                 .roomId(message.getChatRoom().getRoomId().toString())
-                .role(message.getRole())
+                .role(message.getRole().getValue())
                 .content(message.getContent())
                 .fileUrl(message.getFileUrl())
                 .tokenCount(message.getTokenCount())

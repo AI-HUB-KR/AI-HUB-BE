@@ -23,7 +23,7 @@ public record MessageListItemResponse(
     public static MessageListItemResponse from(Message message) {
         return MessageListItemResponse.builder()
                 .messageId(message.getMessageId().toString())
-                .role(message.getRole())
+                .role(message.getRole().getValue())
                 .content(message.getContent())
                 .tokenCount(message.getTokenCount())
                 .coinCount(message.getCoinCount())
