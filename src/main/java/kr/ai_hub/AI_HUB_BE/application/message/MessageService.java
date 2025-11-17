@@ -134,6 +134,13 @@ public class MessageService {
             UserWallet wallet = userWalletRepository.findByUser(user)
                     .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
 
+            // 잔고 검증
+            if (wallet.getBalance().compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("코인 잔액이 음수입니다: userId={}, balance={}", userId, wallet.getBalance());
+                emitter.completeWithError(new InsufficientBalanceException("코인 잔액이 부족합니다"));
+                return;
+            }
+
             // 2. User 메시지 저장 (별도 트랜잭션)
             Message userMessage = saveUserMessage(chatRoom, aiModel, request);
             log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
