@@ -44,7 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll() // H2 Console 허용
                         .requestMatchers("/login", "/oauth2/**", "/ws/info/**", "/api/token/refresh",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/favicon.ico").permitAll()//허용하는 경로
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/ws/**").permitAll() // OPTIONS 요청 허용
+                        // 모든 OPTIONS 요청 허용 (CORS preflight)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2

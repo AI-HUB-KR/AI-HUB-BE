@@ -15,6 +15,7 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  # H2 웹 콘솔 활성화 (http://localhost:8080/h2-console)
 
   # JPA Configuration
   jpa:
@@ -87,3 +88,15 @@ logging:
     name: logs/ai-hub.log
     max-size: 10MB
     max-history: 30
+
+# Swagger/OpenAPI Configuration
+# http://localhost:8080/swagger-ui/index.html
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: false

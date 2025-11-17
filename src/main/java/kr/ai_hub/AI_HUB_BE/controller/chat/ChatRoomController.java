@@ -1,4 +1,4 @@
-package kr.ai_hub.AI_HUB_BE.controller.chatroom;
+package kr.ai_hub.AI_HUB_BE.controller.chat;
 
 import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.chatroom.ChatRoomService;

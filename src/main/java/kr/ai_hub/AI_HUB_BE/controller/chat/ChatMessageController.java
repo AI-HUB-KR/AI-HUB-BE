@@ -1,4 +1,4 @@
-package kr.ai_hub.AI_HUB_BE.controller.message;
+package kr.ai_hub.AI_HUB_BE.controller.chat;
 
 import kr.ai_hub.AI_HUB_BE.application.message.MessageService;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.MessageListItemResponse;
@@ -16,16 +16,16 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @Slf4j
-@RestController
+@RestController("/api/v1/messages")
 @RequiredArgsConstructor
-public class MessageController {
+public class ChatMessageController {
 
     private final MessageService messageService;
 
     /**
      * 특정 채팅방의 메시지 목록을 페이지네이션하여 조회합니다.
      */
-    @GetMapping("/api/v1/chat-rooms/{roomId}/messages")
+    @GetMapping("/page/{roomId}")
     public ResponseEntity<ApiResponse<Page<MessageListItemResponse>>> getMessages(
             @PathVariable UUID roomId,
             @RequestParam(defaultValue = "0") int page,
@@ -47,9 +47,9 @@ public class MessageController {
     }
 
     /**
-     * 특정 메시지의 상세 정보를 조회합니다.
+     * 특정 메시지 1개의 상세 정보를 조회합니다.
      */
-    @GetMapping("/api/v1/messages/{messageId}")
+    @GetMapping("/{messageId}")
     public ResponseEntity<ApiResponse<MessageResponse>> getMessage(@PathVariable UUID messageId) {
         log.info("메시지 상세 조회 API 호출: messageId={}", messageId);
 
@@ -57,4 +57,6 @@ public class MessageController {
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
+
+
 }
