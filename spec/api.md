@@ -58,15 +58,45 @@
 - **500 Internal Server Error**: 서버 내부 오류
 - **503 Service Unavailable**: 서비스 이용 불가
 
-### 인증 헤더 형식
+### 인증 방식
 
+#### 방식 1: Authorization 헤더 (권장)
 토큰 기반 인증이 필요한 모든 엔드포인트는 아래 형식의 헤더를 포함해야 합니다.
 
 ```http
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-리프레시 토큰을 쿠키에 담아 전송하는 경우 별도의 본문은 필요하지 않습니다.
+**사용 예시**: 웹 애플리케이션, 모바일 앱, SPA(Single Page Application)
+
+#### 방식 2: 쿠키 기반 인증 (선택)
+Access Token을 HttpOnly 쿠키로 저장하여 자동 인증을 지원합니다.
+
+```http
+Cookie: accessToken=<ACCESS_TOKEN>
+```
+
+**특징**:
+- XSS 공격 방지: HttpOnly 플래그로 JavaScript에서 접근 불가
+- CSRF 공격 방지: SameSite=Strict 설정
+- 자동 전송: 브라우저가 자동으로 쿠키를 요청에 포함
+- 명시적 저장 불필요: 쿠키 자동 관리
+
+**사용 예시**: 전통적인 웹 애플리케이션, 서버 사이드 렌더링
+
+#### Refresh Token 갱신
+리프레시 토큰 갱신 API (`POST /api/v1/auth/token/refresh`)를 호출하면:
+- **요청**: refreshToken 쿠키 자동 전송 (별도 본문 불필요)
+- **응답**: 새로운 Access Token을 HttpOnly 쿠키로 설정
+
+```http
+# 요청
+POST /api/v1/auth/token/refresh
+Cookie: refreshToken=<REFRESH_TOKEN>
+
+# 응답 헤더
+Set-Cookie: accessToken=<NEW_ACCESS_TOKEN>; HttpOnly; Secure; SameSite=Strict
+```
 
 ### 에러 코드 정의
 
@@ -1089,9 +1119,9 @@ Content-Type: application/json
   ```
 
 #### 메시지 목록 조회
-- **Method**: GET `/api/v1/chat-rooms/{roomId}/messages`
+- **Method**: GET `/api/v1/messages/page/{roomId}`
 - **설명**: 특정 채팅방의 메시지를 페이지네이션하여 조회합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수 (Bearer Token 또는 쿠키)
 
 **요청 헤더**
 ```http
@@ -1184,7 +1214,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 #### 메시지 상세 조회
 - **Method**: GET `/api/v1/messages/{messageId}`
 - **설명**: 특정 메시지의 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수 (Bearer Token 또는 쿠키)
 
 **요청 헤더**
 ```http
