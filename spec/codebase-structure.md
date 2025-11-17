@@ -26,12 +26,12 @@
 **패키지 전략**: Package by Feature (도메인별 패키지 구조)
 
 ### 통계
-- **전체 Java 파일**: 102개
-- **Entity**: 10개
+- **전체 Java 파일**: 110개
+- **Entity**: 11개 (MessageRole Enum 추가)
 - **Repository**: 9개
 - **Service**: 14개
 - **Controller**: 11개
-- **DTO**: 23개
+- **DTO**: 30개 (Message API 관련 7개 추가)
 
 ---
 
@@ -135,10 +135,17 @@ application/
 │       ├── MostUsedModel.java
 │       └── UserStatsResponse.java
 ├── message/
-│   ├── MessageService.java                      # 메시지 조회 서비스
+│   ├── MessageService.java                      # 메시지 조회/전송/파일업로드 서비스
 │   └── dto/
 │       ├── MessageListItemResponse.java
-│       └── MessageResponse.java
+│       ├── MessageResponse.java
+│       ├── FileUploadResponse.java              # 파일 업로드 응답
+│       ├── SendMessageRequest.java              # 메시지 전송 요청
+│       ├── AiServerResponse.java                # AI 서버 응답 래퍼
+│       ├── AiUploadData.java                    # AI 업로드 응답 데이터
+│       ├── AiChatData.java                      # AI 채팅 응답 데이터
+│       ├── AiUsage.java                         # 토큰 사용량 정보
+│       └── SseEvent.java                        # SSE 이벤트 파싱 DTO
 ├── paymenthistory/
 │   ├── PaymentHistoryService.java               # 결제 내역 서비스
 │   └── dto/PaymentResponse.java
@@ -176,7 +183,9 @@ domain/
 │   ├── entity/CoinTransaction.java              # 코인 거래 엔티티
 │   └── repository/CoinTransactionRepository.java
 ├── message/
-│   ├── entity/Message.java                      # 메시지 엔티티 (UUID v7)
+│   ├── entity/
+│   │   ├── Message.java                         # 메시지 엔티티 (UUID v7)
+│   │   └── MessageRole.java                     # Enum: USER, ASSISTANT
 │   └── repository/MessageRepository.java
 ├── paymenthistory/
 │   ├── entity/PaymentHistory.java               # 결제 내역 엔티티
@@ -219,12 +228,14 @@ global/
 ├── config/
 │   ├── JpaConfig.java                           # JPA 설정 (Auditing)
 │   ├── OpenApiConfig.java                       # Swagger/OpenAPI 설정
-│   └── SecurityConfig.java                      # Spring Security 설정
+│   ├── SecurityConfig.java                      # Spring Security 설정
+│   └── WebClientConfig.java                     # WebClient 설정 (AI 서버 통신)
 └── error/
     ├── ErrorCode.java                           # 에러 코드 Enum
     ├── GlobalExceptionHandler.java              # 전역 예외 핸들러
     └── exception/
         ├── BaseException.java                   # 기본 예외 클래스
+        ├── AIServerException.java               # AI 서버 통신 예외
         ├── ForbiddenException.java
         ├── InsufficientBalanceException.java
         ├── MessageNotFoundException.java
@@ -314,14 +325,24 @@ API Endpoints:
 Controller:  controller/chat/ChatMessageController.java
 Service:     application/message/MessageService.java
 Entity:      domain/message/entity/Message.java
+            domain/message/entity/MessageRole.java (Enum)
 Repository:  domain/message/repository/MessageRepository.java
 DTOs:
   - application/message/dto/MessageResponse.java
   - application/message/dto/MessageListItemResponse.java
+  - application/message/dto/FileUploadResponse.java
+  - application/message/dto/SendMessageRequest.java
+  - application/message/dto/AiServerResponse.java
+  - application/message/dto/AiUploadData.java
+  - application/message/dto/AiChatData.java
+  - application/message/dto/AiUsage.java
+  - application/message/dto/SseEvent.java
 
 API Endpoints:
-  - GET /api/v1/messages/page/{roomId}        # 메시지 목록 (페이지네이션)
-  - GET /api/v1/messages/{messageId}          # 메시지 상세
+  - GET  /api/v1/messages/page/{roomId}                # 메시지 목록 (페이지네이션)
+  - GET  /api/v1/messages/{messageId}                  # 메시지 상세
+  - POST /api/v1/messages/files/upload                 # 파일 업로드 (AI 서버)
+  - POST /api/v1/messages/send/{roomId} (text/event-stream) # 메시지 전송 (SSE)
 ```
 
 ### UserWallet (사용자 지갑)
@@ -432,6 +453,7 @@ API 응답 래퍼:          global/common/response/ApiResponse.java
 JPA 설정:              global/config/JpaConfig.java
 OpenAPI/Swagger 설정:  global/config/OpenApiConfig.java
 Security 설정:         global/config/SecurityConfig.java
+WebClient 설정:        global/config/WebClientConfig.java
 ```
 
 ### 애플리케이션 진입점
@@ -448,12 +470,14 @@ Main 클래스:           AiHubBeApplication.java
 
 ```yaml
 주요 설정:
+  - spring.threads.virtual.enabled: Virtual Threads 활성화 (Java 21+)
   - spring.datasource: 데이터베이스 연결 (H2/PostgreSQL)
   - spring.jpa: JPA/Hibernate 설정
     - default_batch_fetch_size: 100 (N+1 해결)
   - spring.security.oauth2: Kakao OAuth2 설정
   - jwt: JWT 토큰 설정 (secret, expiration)
   - cors: CORS 허용 origin 설정
+  - ai-server.url: AI 서버 URL 설정 (외부 MSA 통신)
   - logging: 로깅 레벨 설정
 ```
 
@@ -465,6 +489,7 @@ Main 클래스:           AiHubBeApplication.java
   - Spring Boot 3.5.6
   - Spring Security
   - Spring Data JPA
+  - Spring WebFlux (WebClient only, 리액티브 스택 미사용)
   - PostgreSQL Driver
   - H2 Database
   - Lombok
@@ -634,7 +659,28 @@ Exception:    global/error/exception/{Name}Exception.java
 
 ## 📌 최근 주요 변경사항
 
-### 2025-11-17
+### 2025-11-17 (Virtual Threads 마이그레이션)
+- **Virtual Threads 적용**: Java 21+ Virtual Threads 활성화로 코드 간소화
+  - `application.yaml`에 `spring.threads.virtual.enabled: true` 추가
+  - `@EnableAsync` 제거 (Virtual Threads가 자동으로 동시성 처리)
+  - MessageService 리팩토링: 비동기 방식 → 동기 방식 (Virtual Threads가 I/O 블로킹 처리)
+  - WebClientConfig 간소화: Netty 저수준 설정 제거
+- **Message API 완전 구현**:
+  - `POST /api/v1/messages/files/upload`: 파일 업로드 API (AI 서버 연동)
+  - `POST /api/v1/messages/send/{roomId}`: 메시지 전송 및 SSE 스트리밍 API
+  - MessageRole Enum 추가 (USER, ASSISTANT)
+  - Message 엔티티 필드 추가: `response_id`, 도메인 메서드 추가
+  - 7개 DTO 추가: FileUploadResponse, SendMessageRequest, AiServerResponse, AiUploadData, AiChatData, AiUsage, SseEvent
+- **외부 MSA 통신 설정**:
+  - WebClientConfig: AI 서버 통신용 WebClient 설정 추가
+  - AIServerException: AI 서버 통신 예외 처리 추가
+  - `ai-server.url` 환경변수 설정 추가
+- **코인 계산 로직 통합**:
+  - ChatRoom.addCoinUsage() 메서드 추가
+  - Message 전송 시 자동 코인 차감 및 CoinTransaction 기록
+  - 코인 계산 공식: (tokens / 1,000,000) * price_per_1M
+
+### 2025-11-17 (초기)
 - **컨트롤러 구조 개선**: 채팅 관련 컨트롤러를 `chat/` 패키지로 통합
   - `ChatRoomController`, `ChatMessageController`를 단일 패키지에서 관리
 - **Swagger/OpenAPI 추가**: API 문서 자동 생성 설정 (springdoc-openapi-starter-webmvc-ui:2.8.13)

@@ -1287,6 +1287,209 @@ Authorization: Bearer <ACCESS_TOKEN>
   }
   ```
 
+#### 파일 업로드
+- **Method**: POST `/api/v1/messages/files/upload`
+- **설명**: AI 서버에 파일을 업로드하고 file ID를 반환받습니다.
+- **인증**: 필수 (Bearer Token 또는 쿠키)
+
+**요청 헤더**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: multipart/form-data
+```
+
+**요청 바디 (Multipart Form Data)**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| file | File | Y | 업로드할 파일 (jpg, jpeg, png, webp, 최대 10MB) |
+| modelId | integer | Y | AI 모델 ID |
+
+**성공 응답**
+- **201 Created**
+  ```json
+  {
+    "success": true,
+    "detail": {
+      "fileId": "file-abc123xyz"
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+**응답 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| detail.fileId | string | AI 서버가 발급한 파일 ID (메시지 전송 시 사용) |
+
+**오류 응답 예시**
+- **400 Bad Request**: 파일 검증 실패
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "VALIDATION_ERROR",
+      "message": "파일 크기가 너무 큽니다. 최대 크기: 10MB",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **404 Not Found**: 모델 없음
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "MODEL_NOT_FOUND",
+      "message": "AI 모델을 찾을 수 없습니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **502 Bad Gateway**: AI 서버 통신 실패
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "AI_SERVER_ERROR",
+      "message": "AI 서버와의 통신에 실패했습니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+#### 메시지 전송 (SSE 스트리밍)
+- **Method**: POST `/api/v1/messages/send/{roomId}`
+- **설명**: 채팅방에 메시지를 전송하고 AI 응답을 SSE(Server-Sent Events)로 실시간 스트리밍합니다.
+- **인증**: 필수 (Bearer Token 또는 쿠키)
+- **응답 형식**: text/event-stream
+
+**요청 헤더**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+**경로 변수**
+
+| 변수 | 타입 | 설명 |
+|------|------|------|
+| roomId | string | 메시지를 전송할 채팅방 UUID |
+
+**요청 바디**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| message | string | Y | 전송할 메시지 내용 (공백 제외 1자 이상) |
+| modelId | integer | Y | 사용할 AI 모델 ID |
+| fileId | string | N | 첨부 파일 ID (파일 업로드 API로 받은 ID) |
+| previousResponseId | string | N | 이전 대화 응답 ID (대화 맥락 연결용) |
+
+**요청 예시**
+```json
+{
+  "message": "안녕하세요, GPT-4!",
+  "modelId": 1,
+  "fileId": "file-abc123xyz",
+  "previousResponseId": "resp-xyz789"
+}
+```
+
+**SSE 이벤트 스트림**
+
+1. **started** 이벤트 (연결 확인)
+   ```
+   event: started
+   data: Message sending started
+   ```
+
+2. **delta** 이벤트 (응답 텍스트 조각, 여러 번 전송됨)
+   ```
+   event: delta
+   data: 안녕하세요!
+
+   event: delta
+   data:  반갑습니다.
+   ```
+
+3. **completed** 이벤트 (응답 완료)
+   ```
+   event: completed
+   data: {"userMessageId":"uuid-v7","aiResponseId":"resp-123","inputTokens":10,"outputTokens":20}
+   ```
+
+**SSE completed 이벤트 데이터 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| userMessageId | string | 저장된 사용자 메시지 UUID |
+| aiResponseId | string | AI 서버 응답 ID (다음 대화 연결용) |
+| inputTokens | integer | 입력 토큰 수 |
+| outputTokens | integer | 출력 토큰 수 |
+
+**비즈니스 로직**
+- User 메시지를 먼저 DB에 저장 (별도 트랜잭션)
+- AI 서버에서 응답을 SSE 스트리밍으로 수신하며 클라이언트에 전달
+- 응답 완료 후:
+  - 토큰 수 기반 코인 계산: `(tokens / 1,000,000) * price_per_1M`
+  - 사용자 지갑에서 코인 차감
+  - Assistant 메시지 DB에 저장
+  - User 메시지에 responseId, 토큰, 코인 정보 업데이트
+  - ChatRoom의 coinUsage 업데이트
+  - CoinTransaction 기록 생성
+
+**오류 응답**
+- SSE 연결은 오류 발생 시 종료됩니다
+- **404 Not Found**: 채팅방 또는 모델 없음
+- **403 Forbidden**: 채팅방 접근 권한 없음
+- **400 Bad Request**: 잔액 부족 또는 검증 실패
+- **502 Bad Gateway**: AI 서버 통신 실패
+
+**오류 예시 (일반 JSON 응답)**
+```json
+{
+  "success": false,
+  "detail": {
+    "code": "INSUFFICIENT_BALANCE",
+    "message": "코인 잔액이 부족합니다.",
+    "details": null
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**사용 예시 (JavaScript)**
+```javascript
+const eventSource = new EventSource('/api/v1/messages/send/room-uuid', {
+  headers: {
+    'Authorization': 'Bearer ' + token
+  }
+});
+
+eventSource.addEventListener('started', (e) => {
+  console.log('Connection started:', e.data);
+});
+
+eventSource.addEventListener('delta', (e) => {
+  console.log('Response chunk:', e.data);
+  // UI에 텍스트 추가
+});
+
+eventSource.addEventListener('completed', (e) => {
+  const data = JSON.parse(e.data);
+  console.log('Response completed:', data);
+  eventSource.close();
+});
+
+eventSource.addEventListener('error', (e) => {
+  console.error('SSE error:', e);
+  eventSource.close();
+});
+```
+
 ### 5. AI 모델 (AIModel)
 
 #### AI 모델 목록 조회

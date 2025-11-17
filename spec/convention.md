@@ -6,8 +6,16 @@
   - UUID 필드는 `UUID` 타입 사용
   - DECIMAL 필드는 `BigDecimal` 타입 사용
   - JSONB 필드는 적절한 컨버터 또는 하이버네이트 타입 사용
+- **Virtual Threads (Java 21+)**: 프로젝트는 Virtual Threads를 활성화하여 동시성을 처리합니다
+  - `application.yaml`에 `spring.threads.virtual.enabled: true` 설정
+  - `@Async` 어노테이션 사용 금지 (Virtual Threads가 자동으로 처리)
+  - 동기 방식 코드 작성 (Virtual Threads가 I/O 블로킹 자동 처리)
+  - 블로킹 I/O 작업을 평범한 동기 코드로 작성 (예: `WebClient.toStream()`)
+- **외부 MSA 통신**: AI 서버와의 통신은 WebClient를 사용합니다
+  - WebClient는 HTTP 클라이언트로만 사용 (Reactive Stack 사용 안 함)
+  - `global/config/WebClientConfig.java`에서 설정 관리
+  - SSE(Server-Sent Events) 스트리밍 지원
 - Response 및 Error 클래스들은 from 및 builder 패턴을 활용하여 일관된 생성 방식을 유지합니다
-- 현재 프로젝트는 최소 구조로 초기 설정 단계에 있습니다
 - 추가적인 패키지나 디렉토리가 필요할 경우 `convention.md`에 명시된 구조를 참고하여 일관성 있게 확장합니다
 
 ## API 응답 구조 표준
@@ -72,6 +80,9 @@
 public enum ErrorCode {
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "인증에 실패했습니다"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력값 검증에 실패했습니다"),
+
+    // 외부 서비스 오류
+    AI_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "AI 서버와의 통신에 실패했습니다"),
     // ...
 
     private final HttpStatus status;
@@ -121,6 +132,21 @@ public class RoomNotFoundException extends BaseException {
 
     public RoomNotFoundException(String message) {
         super(ErrorCode.ROOM_NOT_FOUND, message);
+    }
+}
+
+// 외부 서비스 통신 예외
+public class AIServerException extends BaseException {
+    public AIServerException() {
+        super(ErrorCode.AI_SERVER_ERROR);
+    }
+
+    public AIServerException(String message) {
+        super(ErrorCode.AI_SERVER_ERROR, message);
+    }
+
+    public AIServerException(String message, Throwable cause) {
+        super(ErrorCode.AI_SERVER_ERROR, message, cause);
     }
 }
 ```
