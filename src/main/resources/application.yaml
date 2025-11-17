@@ -73,6 +73,10 @@ jwt:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8080}
 
+# AI Server Configuration
+ai-server:
+  url: ${AI_SERVER_URL:http://localhost:3000}
+
 # Logging Configuration
 logging:
   level:

@@ -27,6 +27,9 @@ public enum ErrorCode {
     TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다"),
     SYSTEM_ILLEGAL_STATE(HttpStatus.CONFLICT, "시스템 상태가 유효하지 않습니다"),
 
+    // 외부 서비스 오류
+    AI_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "AI 서버와의 통신에 실패했습니다"),
+
     // 공통 오류
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "서비스를 사용할 수 없습니다");

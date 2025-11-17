@@ -30,8 +30,9 @@ public class Message {
     @JoinColumn(name = "room_id", nullable = false, foreignKey = @ForeignKey(name = "fk_message_chat_room"))
     private ChatRoom chatRoom;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 10, nullable = false)
-    private String role;
+    private MessageRole role;
 
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
@@ -49,7 +50,32 @@ public class Message {
     @JoinColumn(name = "model_id", foreignKey = @ForeignKey(name = "fk_message_ai_model"))
     private AIModel aiModel;
 
+    @Column(name = "response_id", length = 100)
+    private String responseId;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * 토큰 수와 코인 수를 업데이트합니다.
+     * 도메인 로직: 메시지의 토큰 및 코인 정보를 설정
+     *
+     * @param tokenCount 토큰 수
+     * @param coinCount 코인 수
+     */
+    public void updateTokenAndCoin(BigDecimal tokenCount, BigDecimal coinCount) {
+        this.tokenCount = tokenCount;
+        this.coinCount = coinCount;
+    }
+
+    /**
+     * AI 응답 ID를 업데이트합니다.
+     * USER 메시지에 대응하는 ASSISTANT 메시지의 ID를 참조
+     *
+     * @param responseId AI 응답 메시지 ID
+     */
+    public void updateResponseId(String responseId) {
+        this.responseId = responseId;
+    }
 }
