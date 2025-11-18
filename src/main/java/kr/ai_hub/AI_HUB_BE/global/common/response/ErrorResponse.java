@@ -14,14 +14,14 @@ public record ErrorResponse(
 
     public static ErrorResponse of(ErrorCode errorCode) {
         return ErrorResponse.builder()
-                .code(errorCode.name())
+                .code(errorCode.getCode())
                 .message(errorCode.getMessage())
                 .build();
     }
 
     public static ErrorResponse of(ErrorCode errorCode, String details) {
         return ErrorResponse.builder()
-                .code(errorCode.name())
+                .code(errorCode.getCode())
                 .message(errorCode.getMessage())
                 .details(details)
                 .build();

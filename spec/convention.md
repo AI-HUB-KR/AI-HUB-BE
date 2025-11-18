@@ -74,26 +74,79 @@
 
 모든 에러 코드는 `global/error/ErrorCode.java` Enum에 중앙 집중식으로 정의합니다.
 
+**중요**: ErrorCode는 `code`(에러코드)와 `message`(에러메시지)만 포함하며, **HttpStatus는 포함하지 않습니다**.
+HttpStatus는 `GlobalExceptionHandler`의 `resolveHttpStatus()` 메서드에서 매핑됩니다.
+
 ```java
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
-    AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "인증에 실패했습니다"),
-    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력값 검증에 실패했습니다"),
+    // 인증 전 (Public API) - 보안을 위해 일반화된 메시지
+    AUTHENTICATION_FAILED("AUTH_001", "인증에 실패했습니다"),
+    VALIDATION_ERROR("VALID_001", "입력값 검증에 실패했습니다"),
+
+    // 인증 후 (Authenticated API) - 구체적인 메시지
+    USER_NOT_FOUND("USER_001", "사용자를 찾을 수 없습니다"),
 
     // 외부 서비스 오류
-    AI_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "AI 서버와의 통신에 실패했습니다"),
-    // ...
+    AI_SERVER_ERROR("EXT_001", "AI 서버와의 통신에 실패했습니다"),
 
-    private final HttpStatus status;
+    // 공통 오류
+    INTERNAL_SERVER_ERROR("SYS_002", "서버 내부 오류가 발생했습니다");
+
+    private final String code;
     private final String message;
 }
 ```
 
 ### 에러 코드 네이밍 규칙
-- **대문자 스네이크 케이스** 사용 (예: `ROOM_NOT_FOUND`)
+- **ErrorCode 이름**: 대문자 스네이크 케이스 (예: `ROOM_NOT_FOUND`)
+- **code 필드**: 도메인 접두사 + 일련번호 (예: `"AUTH_001"`, `"USER_001"`, `"PAYMENT_001"`)
+  - `AUTH_xxx`: 인증 관련 에러
+  - `VALID_xxx`: 검증 관련 에러
+  - `USER_xxx`: 사용자 관련 에러
+  - `ROOM_xxx`: 채팅방 관련 에러
+  - `MSG_xxx`: 메시지 관련 에러
+  - `MODEL_xxx`: AI 모델 관련 에러
+  - `WALLET_xxx`: 지갑 관련 에러
+  - `PAYMENT_xxx`: 결제 관련 에러
+  - `TRANS_xxx`: 거래 관련 에러
+  - `EXT_xxx`: 외부 서비스 관련 에러
+  - `SYS_xxx`: 시스템 관련 에러
 - **명확하고 구체적인 이름** 사용
-- **도메인별 접두사** 고려 (예: `PAYMENT_FAILED`, `TOKEN_INVALID`)
+
+### ErrorCode → HttpStatus 매핑
+
+`GlobalExceptionHandler.resolveHttpStatus()` 메서드에서 ErrorCode를 HttpStatus로 매핑합니다:
+
+| HttpStatus | ErrorCode 목록 |
+|-----------|----------------|
+| **401 UNAUTHORIZED** | AUTHENTICATION_FAILED, INVALID_TOKEN |
+| **403 FORBIDDEN** | FORBIDDEN |
+| **404 NOT_FOUND** | USER_NOT_FOUND, ROOM_NOT_FOUND, MESSAGE_NOT_FOUND, MODEL_NOT_FOUND, WALLET_NOT_FOUND, PAYMENT_NOT_FOUND, TRANSACTION_NOT_FOUND |
+| **409 CONFLICT** | SYSTEM_ILLEGAL_STATE |
+| **502 BAD_GATEWAY** | AI_SERVER_ERROR |
+| **503 SERVICE_UNAVAILABLE** | SERVICE_UNAVAILABLE |
+| **500 INTERNAL_SERVER_ERROR** | INTERNAL_SERVER_ERROR |
+| **400 BAD_REQUEST** | 그 외 모든 경우 (default) |
+
+**매핑 구현 예시**:
+```java
+private HttpStatus resolveHttpStatus(ErrorCode errorCode) {
+    return switch (errorCode) {
+        case AUTHENTICATION_FAILED, INVALID_TOKEN -> HttpStatus.UNAUTHORIZED;
+        case FORBIDDEN -> HttpStatus.FORBIDDEN;
+        case USER_NOT_FOUND, ROOM_NOT_FOUND, MESSAGE_NOT_FOUND,
+             MODEL_NOT_FOUND, WALLET_NOT_FOUND, PAYMENT_NOT_FOUND,
+             TRANSACTION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+        case SYSTEM_ILLEGAL_STATE -> HttpStatus.CONFLICT;
+        case AI_SERVER_ERROR -> HttpStatus.BAD_GATEWAY;
+        case SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+        case INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+        default -> HttpStatus.BAD_REQUEST;
+    };
+}
+```
 
 ### 보안 원칙
 - **인증 전 API**: 일반화된 에러 코드 사용 (예: `AUTHENTICATION_FAILED`, `VALIDATION_ERROR`)

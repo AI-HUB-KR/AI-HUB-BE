@@ -20,15 +20,52 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * ErrorCode를 HttpStatus로 매핑합니다.
+     *
+     * @param errorCode 에러 코드
+     * @return HTTP 상태 코드
+     */
+    private HttpStatus resolveHttpStatus(ErrorCode errorCode) {
+        return switch (errorCode) {
+            // 401 UNAUTHORIZED
+            case AUTHENTICATION_FAILED, INVALID_TOKEN -> HttpStatus.UNAUTHORIZED;
+
+            // 403 FORBIDDEN
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+
+            // 404 NOT_FOUND
+            case USER_NOT_FOUND, ROOM_NOT_FOUND, MESSAGE_NOT_FOUND,
+                 MODEL_NOT_FOUND, WALLET_NOT_FOUND, PAYMENT_NOT_FOUND,
+                 TRANSACTION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+
+            // 409 CONFLICT
+            case SYSTEM_ILLEGAL_STATE -> HttpStatus.CONFLICT;
+
+            // 502 BAD_GATEWAY
+            case AI_SERVER_ERROR -> HttpStatus.BAD_GATEWAY;
+
+            // 503 SERVICE_UNAVAILABLE
+            case SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+
+            // 500 INTERNAL_SERVER_ERROR
+            case INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+
+            // 400 BAD_REQUEST (default for validation, business logic errors)
+            default -> HttpStatus.BAD_REQUEST;
+        };
+    }
+
     // AI 서버 통신 예외 처리
     @ExceptionHandler(AIServerException.class)
     public ResponseEntity<ApiResponse<ErrorResponse>> handleAIServerException(AIServerException e) {
         log.error("AI 서버 통신 예외 발생: {}", e.getMessage(), e);
 
         ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
+        HttpStatus status = resolveHttpStatus(e.getErrorCode());
 
         return ResponseEntity
-                .status(e.getErrorCode().getStatus())
+                .status(status)
                 .body(response);
     }
 
@@ -38,9 +75,10 @@ public class GlobalExceptionHandler {
         log.error("시스템 상태 예외 발생: {}", e.getMessage(), e);
 
         ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
+        HttpStatus status = resolveHttpStatus(e.getErrorCode());
 
         return ResponseEntity
-                .status(e.getErrorCode().getStatus())
+                .status(status)
                 .body(response);
     }
 
@@ -51,9 +89,10 @@ public class GlobalExceptionHandler {
 
         ErrorCode errorCode = e.getErrorCode();
         ApiResponse<ErrorResponse> response = ApiResponse.error(errorCode);
+        HttpStatus status = resolveHttpStatus(errorCode);
 
         return ResponseEntity
-                .status(errorCode.getStatus())
+                .status(status)
                 .body(response);
     }
 
@@ -98,7 +137,7 @@ public class GlobalExceptionHandler {
         log.warn("잘못된 인자 전달: {}", e.getMessage());
 
         ErrorResponse errorResponse = ErrorResponse.of(
-                ErrorCode.VALIDATION_ERROR.name(),
+                ErrorCode.VALIDATION_ERROR.getCode(),
                 ErrorCode.VALIDATION_ERROR.getMessage(),
                 e.getMessage()
         );
