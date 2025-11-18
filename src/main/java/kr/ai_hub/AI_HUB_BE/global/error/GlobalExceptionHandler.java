@@ -56,39 +56,18 @@ public class GlobalExceptionHandler {
         };
     }
 
-    // AI 서버 통신 예외 처리
-    @ExceptionHandler(AIServerException.class)
-    public ResponseEntity<ApiResponse<ErrorResponse>> handleAIServerException(AIServerException e) {
-        log.error("AI 서버 통신 예외 발생: {}", e.getMessage(), e);
-
-        ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
-        HttpStatus status = resolveHttpStatus(e.getErrorCode());
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
-    }
-
-    // 시스템 상태 예외 처리
-    @ExceptionHandler(IllegalSystemStateException.class)
-    public ResponseEntity<ApiResponse<ErrorResponse>> handleIllegalSystemStateException(IllegalSystemStateException e) {
-        log.error("시스템 상태 예외 발생: {}", e.getMessage(), e);
-
-        ApiResponse<ErrorResponse> response = ApiResponse.error(e.getErrorCode(), e.getMessage());
-        HttpStatus status = resolveHttpStatus(e.getErrorCode());
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
-    }
-
-    // 커스텀 예외 처리
+    // BaseException 및 모든 서브클래스 처리
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ApiResponse<ErrorResponse>> handleBaseException(BaseException e) {
-        log.warn("비즈니스 예외 발생: {}", e.getMessage(), e);
+        // 중요한 예외는 ERROR 레벨로 로깅
+        if (e instanceof AIServerException || e instanceof IllegalSystemStateException) {
+            log.error("중요 예외 발생: {}", e.getMessage(), e);
+        } else {
+            log.warn("비즈니스 예외 발생: {}", e.getMessage(), e);
+        }
 
         ErrorCode errorCode = e.getErrorCode();
-        ApiResponse<ErrorResponse> response = ApiResponse.error(errorCode);
+        ApiResponse<ErrorResponse> response = ApiResponse.error(errorCode, e.getMessage());
         HttpStatus status = resolveHttpStatus(errorCode);
 
         return ResponseEntity
