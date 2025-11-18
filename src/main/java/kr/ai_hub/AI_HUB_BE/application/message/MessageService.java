@@ -112,162 +112,215 @@ public class MessageService {
      * @param request 메시지 전송 요청
      * @param emitter SSE Emitter
      */
+    /**
+     * 메시지를 전송하고 AI 응답을 SSE로 스트리밍합니다.
+     * 리팩토링된 오케스트레이션 메서드 - 각 단계별 책임을 분리된 메서드에 위임합니다.
+     *
+     * @param roomId  채팅방 ID
+     * @param request 메시지 전송 요청
+     * @param emitter SSE Emitter
+     */
     public void sendMessage(UUID roomId, SendMessageRequest request, SseEmitter emitter) {
+        Message userMessage = null;
+
         try {
             log.info("메시지 전송 시작: roomId={}, modelId={}", roomId, request.modelId());
 
-            // 1. 사전 검증
-            Integer userId = securityContextHelper.getCurrentUserId();
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+            // 1. 요청 검증 및 리소스 조회
+            ValidatedMessageContext context = validateMessageRequest(roomId, request);
 
-            ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                    .orElseThrow(() -> new RoomNotFoundException("채팅방을 찾을 수 없습니다: " + roomId));
-
-            // 권한 확인
-            if (!chatRoom.getUser().getUserId().equals(userId)) {
-                log.warn("채팅방 접근 권한 없음: roomId={}, userId={}", roomId, userId);
-                emitter.completeWithError(new ForbiddenException("해당 채팅방에 접근할 권한이 없습니다"));
-                return;
-            }
-
-            AIModel aiModel = aiModelRepository.findById(request.modelId())
-                    .orElseThrow(() -> new ModelNotFoundException("AI 모델을 찾을 수 없습니다: " + request.modelId()));
-
-            UserWallet wallet = userWalletRepository.findByUser(user)
-                    .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
-
-            // 잔고 검증
-            if (wallet.getBalance().compareTo(BigDecimal.ZERO) < 0) {
-                log.warn("코인 잔액이 음수입니다: userId={}, balance={}", userId, wallet.getBalance());
-                emitter.completeWithError(new InsufficientBalanceException("코인 잔액이 부족합니다"));
-                return;
-            }
-
-            // 2. User 메시지 저장 (별도 트랜잭션)
-            Message userMessage = saveUserMessage(chatRoom, aiModel, request);
+            // 2. User 메시지 저장
+            userMessage = saveUserMessage(context.chatRoom(), context.aiModel(), request);
             log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
 
             // SSE 시작 알림
             emitter.send(SseEmitter.event().name("started").data("Message sending started"));
 
-            // 3. AI 서버 SSE 스트리밍 (동기 방식)
-            String aiResponseId = null;
-            StringBuilder fullContent = new StringBuilder();
-            AiUsage usage = null;
+            // 3. 요청 바디 구성
+            Map<String, Object> requestBody = buildRequestBody(request, context.aiModel());
 
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("message", request.message());
-            requestBody.put("model", aiModel.getModelName());
-            if (request.fileId() != null) {
-                requestBody.put("file_id", request.fileId());
-            }
-            if (request.previousResponseId() != null) {
-                requestBody.put("previous_response_id", request.previousResponseId());
-            }
+            // 4. AI 서버로부터 SSE 스트리밍
+            AiStreamingResult streamResult = streamAiResponse(requestBody, emitter);
 
-            // AI 서버와 SSE 통신 (blocking stream으로 변환)
-            try {
-                var stream = aiServerWebClient.post()
-                        .uri("/ai/chat")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(requestBody)
-                        .retrieve()
-                        .bodyToFlux(String.class)
-                        .toStream();  // Flux를 blocking Stream으로 변환
+            // 5. 응답 처리 (코인 계산 및 저장)
+            processCompletedResponse(
+                    context.chatRoom(), context.aiModel(), context.user(), context.wallet(),
+                    userMessage, streamResult.aiResponseId(), streamResult.fullContent(),
+                    streamResult.usage()
+            );
 
-                // Stream을 순회하며 SSE 이벤트 처리
-                for (String line : (Iterable<String>) stream::iterator) {
-                    if (line.startsWith("data: ")) {
-                        String jsonData = line.substring(6);
-                        SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+            // 6. 완료 이벤트 전달
+            sendCompletionEvent(emitter, userMessage, streamResult);
+            log.info("메시지 전송 완료: roomId={}", roomId);
 
-                        switch (event.type()) {
-                            case "response.created":
-                                if (event.response() != null) {
-                                    aiResponseId = event.response().id();
-                                    log.debug("AI 응답 생성: id={}", aiResponseId);
-                                }
-                                break;
+        } catch (JsonProcessingException e) {
+            // AI 응답 JSON 파싱 실패
+            log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
+            handleMessageError(userMessage, new AIServerException("AI 응답 형식이 유효하지 않습니다", e), emitter);
 
-                            case "response.output_text.delta":
-                                if (event.delta() != null) {
-                                    fullContent.append(event.delta());
-                                    // 클라이언트에게 delta 전달
-                                    emitter.send(SseEmitter.event()
-                                            .name("delta")
-                                            .data(event.delta()));
-                                }
-                                break;
+        } catch (IOException e) {
+            // SSE 통신 에러
+            log.error("SSE 통신 에러: {}", e.getMessage(), e);
+            handleMessageError(userMessage, new AIServerException("SSE 연결 실패", e), emitter);
 
-                            case "response.completed":
-                                if (event.response() != null) {
-                                    usage = event.response().usage();
-                                    log.info("AI 응답 완료: tokens={}", usage.totalTokens());
-                                }
-                                break;
-
-                            case "error":
-                                if (event.error() != null) {
-                                    log.error("AI 서버 에러: {}", event.error().message());
-                                    throw new AIServerException(event.error().message());
-                                }
-                                break;
-                        }
-                    }
-                }
-
-                // 4. 코인 계산 및 차감, 메시지 저장
-                processCompletedResponse(
-                        chatRoom, aiModel, user, wallet, userMessage,
-                        aiResponseId, fullContent.toString(), usage
-                );
-
-                // 5. 완료 이벤트 전달
-                Map<String, Object> completedData = new HashMap<>();
-                completedData.put("userMessageId", userMessage.getMessageId());
-                completedData.put("aiResponseId", aiResponseId);
-                completedData.put("inputTokens", usage.inputTokens());
-                completedData.put("outputTokens", usage.outputTokens());
-                emitter.send(SseEmitter.event().name("completed").data(completedData));
-                emitter.complete();
-
-                log.info("메시지 전송 완료: roomId={}", roomId);
-
-            } catch (IOException e) {
-                // SSE 통신 에러 (네트워크, 연결 실패 등)
-                log.error("SSE 통신 에러: {}", e.getMessage(), e);
-                throw new AIServerException("SSE 연결 실패", e);
-            } catch (JsonProcessingException e) {
-                // AI 응답 JSON 파싱 실패
-                log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
-                throw new AIServerException("AI 응답 형식이 유효하지 않습니다", e);
-            } catch (IllegalStateException e) {
-                // Stream 변환 실패
-                log.error("스트림 변환 실패: {}", e.getMessage(), e);
-                throw new AIServerException("스트림 처리 중 오류가 발생했습니다", e);
-            } catch (Exception e) {
-                // 예상치 못한 에러
-                log.error("예상치 못한 에러: {}", e.getMessage(), e);
-                throw new AIServerException("메시지 전송 중 에러가 발생했습니다", e);
-            }
+        } catch (IllegalStateException e) {
+            // Stream 변환 실패
+            log.error("스트림 변환 실패: {}", e.getMessage(), e);
+            handleMessageError(userMessage, new AIServerException("스트림 처리 중 오류가 발생했습니다", e), emitter);
 
         } catch (Exception e) {
-            log.error("메시지 전송 중 에러: {}", e.getMessage(), e);
+            // 예상치 못한 에러
+            log.error("예상치 못한 에러: {}", e.getMessage(), e);
+            handleMessageError(userMessage, e, emitter);
+        }
+    }
 
-            // AI 통신 실패 시 User 메시지 삭제 (보상 트랜잭션)
-            if (userMessage != null) {
-                try {
-                    deleteUserMessage(userMessage);
-                    log.info("AI 통신 실패로 User 메시지 삭제 완료: messageId={}", userMessage.getMessageId());
-                } catch (Exception deleteError) {
-                    log.error("User 메시지 삭제 실패: messageId={}, error={}",
-                            userMessage.getMessageId(), deleteError.getMessage(), deleteError);
+    /**
+     * 완료 이벤트를 클라이언트에게 전송합니다.
+     */
+    private void sendCompletionEvent(SseEmitter emitter, Message userMessage, AiStreamingResult result)
+            throws IOException {
+        Map<String, Object> completedData = new HashMap<>();
+        completedData.put("userMessageId", userMessage.getMessageId());
+        completedData.put("aiResponseId", result.aiResponseId());
+        completedData.put("inputTokens", result.usage().inputTokens());
+        completedData.put("outputTokens", result.usage().outputTokens());
+        emitter.send(SseEmitter.event().name("completed").data(completedData));
+        emitter.complete();
+    }
+
+    /**
+     * 메시지 전송 실패 시 에러를 처리합니다 (보상 트랜잭션).
+     */
+    private void handleMessageError(Message userMessage, Exception error, SseEmitter emitter) {
+        log.error("메시지 전송 중 에러: {}", error.getMessage(), error);
+
+        // AI 통신 실패 시 User 메시지 삭제 (보상 트랜잭션)
+        if (userMessage != null) {
+            try {
+                deleteUserMessage(userMessage);
+                log.info("AI 통신 실패로 User 메시지 삭제 완료: messageId={}", userMessage.getMessageId());
+            } catch (Exception deleteError) {
+                log.error("User 메시지 삭제 실패: messageId={}, error={}",
+                        userMessage.getMessageId(), deleteError.getMessage(), deleteError);
+            }
+        }
+
+        emitter.completeWithError(error);
+    }
+
+    /**
+     * AI 서버로부터 SSE 스트리밍 응답을 처리합니다.
+     */
+    private AiStreamingResult streamAiResponse(Map<String, Object> requestBody, SseEmitter emitter)
+            throws JsonProcessingException, IOException, IllegalStateException {
+        String aiResponseId = null;
+        StringBuilder fullContent = new StringBuilder();
+        AiUsage usage = null;
+
+        var stream = aiServerWebClient.post()
+                .uri("/ai/chat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .toStream();
+
+        for (String line : (Iterable<String>) stream::iterator) {
+            if (line.startsWith("data: ")) {
+                String jsonData = line.substring(6);
+                SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+
+                switch (event.type()) {
+                    case "response.created":
+                        if (event.response() != null) {
+                            aiResponseId = event.response().id();
+                            log.debug("AI 응답 생성: id={}", aiResponseId);
+                        }
+                        break;
+
+                    case "response.output_text.delta":
+                        if (event.delta() != null) {
+                            fullContent.append(event.delta());
+                            // 클라이언트에게 delta 전달
+                            emitter.send(SseEmitter.event()
+                                    .name("delta")
+                                    .data(event.delta()));
+                        }
+                        break;
+
+                    case "response.completed":
+                        if (event.response() != null) {
+                            usage = event.response().usage();
+                            log.info("AI 응답 완료: tokens={}", usage.totalTokens());
+                        }
+                        break;
+
+                    case "error":
+                        if (event.error() != null) {
+                            log.error("AI 서버 에러: {}", event.error().message());
+                            throw new AIServerException(event.error().message());
+                        }
+                        break;
                 }
             }
-
-            emitter.completeWithError(e);
         }
+
+        return new AiStreamingResult(aiResponseId, fullContent.toString(), usage);
+    }
+
+    /**
+     * AI 서버로 전송할 요청 바디를 구성합니다.
+     */
+    private Map<String, Object> buildRequestBody(SendMessageRequest request, AIModel aiModel) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("message", request.message());
+        requestBody.put("model", aiModel.getModelName());
+
+        if (request.fileId() != null) {
+            requestBody.put("file_id", request.fileId());
+        }
+        if (request.previousResponseId() != null) {
+            requestBody.put("previous_response_id", request.previousResponseId());
+        }
+
+        return requestBody;
+    }
+
+    /**
+     * 메시지 전송 요청을 검증하고 필요한 리소스를 조회합니다.
+     */
+    private ValidatedMessageContext validateMessageRequest(UUID roomId, SendMessageRequest request) {
+        Integer userId = securityContextHelper.getCurrentUserId();
+
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+
+        // 채팅방 조회
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RoomNotFoundException("채팅방을 찾을 수 없습니다: " + roomId));
+
+        // 채팅방 권한 확인
+        if (!chatRoom.getUser().getUserId().equals(userId)) {
+            log.warn("채팅방 접근 권한 없음: roomId={}, userId={}", roomId, userId);
+            throw new ForbiddenException("해당 채팅방에 접근할 권한이 없습니다");
+        }
+
+        // AI 모델 조회
+        AIModel aiModel = aiModelRepository.findById(request.modelId())
+                .orElseThrow(() -> new ModelNotFoundException("AI 모델을 찾을 수 없습니다: " + request.modelId()));
+
+        // 지갑 조회 및 잔고 검증
+        UserWallet wallet = userWalletRepository.findByUser(user)
+                .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
+
+        if (wallet.getBalance().compareTo(BigDecimal.ZERO) < 0) {
+            log.warn("코인 잔액이 음수입니다: userId={}, balance={}", userId, wallet.getBalance());
+            throw new InsufficientBalanceException("코인 잔액이 부족합니다");
+        }
+
+        return new ValidatedMessageContext(user, chatRoom, aiModel, wallet);
     }
 
     /**
@@ -477,4 +530,23 @@ public class MessageService {
         }
         return filename.substring(lastDotIndex + 1).toLowerCase();
     }
+
+    /**
+     * 메시지 요청 검증 결과를 담는 DTO
+     */
+    private record ValidatedMessageContext(
+            User user,
+            ChatRoom chatRoom,
+            AIModel aiModel,
+            UserWallet wallet
+    ) {}
+
+    /**
+     * AI 서버 SSE 스트리밍 결과를 담는 DTO
+     */
+    private record AiStreamingResult(
+            String aiResponseId,
+            String fullContent,
+            AiUsage usage
+    ) {}
 }
