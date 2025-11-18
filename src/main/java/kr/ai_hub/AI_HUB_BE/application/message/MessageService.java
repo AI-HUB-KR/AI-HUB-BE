@@ -1,5 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.application.message;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.message.dto.*;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.entity.AIModel;
@@ -35,11 +36,13 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -231,13 +234,38 @@ public class MessageService {
 
                 log.info("메시지 전송 완료: roomId={}", roomId);
 
+            } catch (IOException e) {
+                // SSE 통신 에러 (네트워크, 연결 실패 등)
+                log.error("SSE 통신 에러: {}", e.getMessage(), e);
+                throw new AIServerException("SSE 연결 실패", e);
+            } catch (JsonProcessingException e) {
+                // AI 응답 JSON 파싱 실패
+                log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
+                throw new AIServerException("AI 응답 형식이 유효하지 않습니다", e);
+            } catch (IllegalStateException e) {
+                // Stream 변환 실패
+                log.error("스트림 변환 실패: {}", e.getMessage(), e);
+                throw new AIServerException("스트림 처리 중 오류가 발생했습니다", e);
             } catch (Exception e) {
-                log.error("AI 서버 통신 에러: {}", e.getMessage(), e);
-                throw new AIServerException("AI 서버 통신 실패: " + e.getMessage(), e);
+                // 예상치 못한 에러
+                log.error("예상치 못한 에러: {}", e.getMessage(), e);
+                throw new AIServerException("메시지 전송 중 에러가 발생했습니다", e);
             }
 
         } catch (Exception e) {
             log.error("메시지 전송 중 에러: {}", e.getMessage(), e);
+
+            // AI 통신 실패 시 User 메시지 삭제 (보상 트랜잭션)
+            if (userMessage != null) {
+                try {
+                    deleteUserMessage(userMessage);
+                    log.info("AI 통신 실패로 User 메시지 삭제 완료: messageId={}", userMessage.getMessageId());
+                } catch (Exception deleteError) {
+                    log.error("User 메시지 삭제 실패: messageId={}, error={}",
+                            userMessage.getMessageId(), deleteError.getMessage(), deleteError);
+                }
+            }
+
             emitter.completeWithError(e);
         }
     }
@@ -256,6 +284,16 @@ public class MessageService {
                 .build();
 
         return messageRepository.save(userMessage);
+    }
+
+    /**
+     * User 메시지를 삭제합니다 (보상 트랜잭션).
+     * AI 통신 실패 시 orphaned User 메시지를 제거하기 위해 사용됩니다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected void deleteUserMessage(Message userMessage) {
+        messageRepository.delete(userMessage);
+        log.debug("User 메시지 삭제: messageId={}", userMessage.getMessageId());
     }
 
     /**
@@ -379,7 +417,7 @@ public class MessageService {
                     )
                     .bodyToMono(AiServerResponse.class)
                     .cast(AiServerResponse.class)
-                    .block();
+                    .block(Duration.ofSeconds(30));  // 30초 타임아웃 명시
 
             if (response == null || !response.success() || response.data() == null) {
                 log.error("AI 서버 응답 없음 또는 실패");

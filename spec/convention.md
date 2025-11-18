@@ -578,7 +578,249 @@ logging:
 - [ ] 파라미터화된 로깅 사용 (`{}` 플레이스홀더)
 - [ ] 민감 정보 로깅 제외
 
-## 7. 체크리스트
+## 7. 외부 서비스 통신 에러 처리 (WebClient)
+
+Virtual Threads 환경에서 WebClient를 사용할 때는 다음 원칙을 준수합니다.
+
+### 7.1 세분화된 예외 처리 (Granular Exception Handling)
+
+**일반적인 catch 블록 대신 구체적인 예외 타입별로 처리합니다.**
+
+#### 나쁜 예시 (Bad)
+```java
+try {
+    // SSE 통신 및 처리
+} catch (Exception e) {  // ❌ 너무 광범위
+    log.error("AI 서버 통신 에러: {}", e.getMessage(), e);
+    throw new AIServerException("AI 서버 통신 실패: " + e.getMessage(), e);
+}
+```
+
+#### 좋은 예시 (Good)
+```java
+try {
+    var stream = aiServerWebClient.post()
+            .uri("/ai/chat")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(requestBody)
+            .retrieve()
+            .bodyToFlux(String.class)
+            .toStream();
+
+    // Stream 처리 로직
+    for (String line : (Iterable<String>) stream::iterator) {
+        SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+        // 이벤트 처리
+    }
+
+} catch (IOException e) {
+    // SSE 통신 에러 (네트워크, 연결 실패 등)
+    log.error("SSE 통신 에러: {}", e.getMessage(), e);
+    throw new AIServerException("SSE 연결 실패", e);
+
+} catch (JsonProcessingException e) {
+    // AI 응답 JSON 파싱 실패
+    log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
+    throw new AIServerException("AI 응답 형식이 유효하지 않습니다", e);
+
+} catch (IllegalStateException e) {
+    // Stream 변환 실패
+    log.error("스트림 변환 실패: {}", e.getMessage(), e);
+    throw new AIServerException("스트림 처리 중 오류가 발생했습니다", e);
+
+} catch (Exception e) {
+    // 예상치 못한 에러
+    log.error("예상치 못한 에러: {}", e.getMessage(), e);
+    throw new AIServerException("메시지 전송 중 에러가 발생했습니다", e);
+}
+```
+
+**예외 타입별 처리 순서**:
+1. **IOException**: 네트워크 에러, SSE 연결 실패
+2. **JsonProcessingException**: JSON 파싱 에러
+3. **IllegalStateException**: 스트림 변환 에러
+4. **TimeoutException**: 타임아웃 에러
+5. **Exception**: 예상치 못한 에러 (fallback)
+
+### 7.2 명시적 타임아웃 처리
+
+**WebClient의 block() 메서드 사용 시 반드시 타임아웃을 명시합니다.**
+
+#### 나쁜 예시 (Bad)
+```java
+AiServerResponse response = aiServerWebClient.post()
+        .uri("/ai/upload")
+        .bodyValue(requestBody)
+        .retrieve()
+        .bodyToMono(AiServerResponse.class)
+        .block();  // ❌ 타임아웃 미지정 (무한 대기 가능)
+```
+
+#### 좋은 예시 (Good)
+```java
+AiServerResponse response = aiServerWebClient.post()
+        .uri("/ai/upload")
+        .bodyValue(requestBody)
+        .retrieve()
+        .bodyToMono(AiServerResponse.class)
+        .block(Duration.ofSeconds(30));  // ✅ 30초 타임아웃 명시
+```
+
+**권장 타임아웃 값**:
+- 일반 API 호출: 10-30초
+- 파일 업로드: 30-60초
+- SSE 스트리밍: toStream() 사용 (타임아웃 불필요, Virtual Threads가 처리)
+
+**필수 import**:
+```java
+import java.time.Duration;
+```
+
+### 7.3 보상 트랜잭션 (Compensating Transaction)
+
+**외부 서비스 통신 실패 시 이미 저장된 데이터를 롤백하는 보상 트랜잭션을 구현합니다.**
+
+#### 문제 상황
+```java
+// User 메시지 저장 (별도 트랜잭션)
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+protected Message saveUserMessage(...) {
+    return messageRepository.save(userMessage);
+}
+
+// AI 서버 통신 (메인 로직)
+public void sendMessage(...) {
+    Message userMessage = saveUserMessage(...);  // ✅ 저장 성공
+
+    // AI 서버 호출
+    // ❌ 여기서 실패하면 User 메시지가 orphaned 상태로 남음
+}
+```
+
+#### 해결 방법 (보상 트랜잭션)
+```java
+public void sendMessage(UUID roomId, SendMessageRequest request, SseEmitter emitter) {
+    Message userMessage = null;
+
+    try {
+        // 1. User 메시지 저장 (별도 트랜잭션)
+        userMessage = saveUserMessage(chatRoom, aiModel, request);
+
+        // 2. AI 서버 통신
+        // SSE 스트리밍 처리...
+
+        // 3. AI 응답 저장
+        processCompletedResponse(...);
+
+    } catch (Exception e) {
+        log.error("메시지 전송 중 에러: {}", e.getMessage(), e);
+
+        // ✅ AI 통신 실패 시 User 메시지 삭제 (보상 트랜잭션)
+        if (userMessage != null) {
+            try {
+                deleteUserMessage(userMessage);
+                log.info("AI 통신 실패로 User 메시지 삭제 완료: messageId={}",
+                         userMessage.getMessageId());
+            } catch (Exception deleteError) {
+                log.error("User 메시지 삭제 실패: messageId={}, error={}",
+                         userMessage.getMessageId(), deleteError.getMessage(), deleteError);
+            }
+        }
+
+        emitter.completeWithError(e);
+    }
+}
+
+/**
+ * User 메시지를 삭제합니다 (보상 트랜잭션).
+ * AI 통신 실패 시 orphaned User 메시지를 제거하기 위해 사용됩니다.
+ */
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+protected void deleteUserMessage(Message userMessage) {
+    messageRepository.delete(userMessage);
+    log.debug("User 메시지 삭제: messageId={}", userMessage.getMessageId());
+}
+```
+
+**보상 트랜잭션 패턴 체크리스트**:
+- [ ] 외부 서비스 호출 전 저장된 엔티티 추적
+- [ ] 외부 서비스 실패 시 저장된 엔티티 삭제
+- [ ] 삭제 메서드도 `REQUIRES_NEW` 전파 속성 사용
+- [ ] 삭제 실패 시에도 원본 예외는 유지
+- [ ] 삭제 성공/실패 모두 로깅
+
+### 7.4 스트림 변환 예외 처리
+
+**Flux.toStream() 사용 시 IllegalStateException 처리를 포함합니다.**
+
+#### 주의 사항
+```java
+var stream = aiServerWebClient.post()
+        .uri("/ai/chat")
+        .retrieve()
+        .bodyToFlux(String.class)
+        .toStream();  // ⚠️ IllegalStateException 발생 가능
+```
+
+`toStream()` 메서드는 다음 상황에서 `IllegalStateException`을 던질 수 있습니다:
+- Reactive context가 올바르게 초기화되지 않은 경우
+- 스트림 변환 중 내부 상태 에러
+
+#### 처리 방법
+위의 7.1 세분화된 예외 처리 패턴에서 `IllegalStateException` catch 블록을 추가하여 처리합니다.
+
+### 7.5 SSE 스트리밍 에러 처리
+
+**SSE(Server-Sent Events) 스트리밍 시 중간에 발생하는 에러도 처리합니다.**
+
+```java
+try {
+    var stream = aiServerWebClient.post()
+            .uri("/ai/chat")
+            .bodyValue(requestBody)
+            .retrieve()
+            .bodyToFlux(String.class)
+            .toStream();
+
+    // SSE 이벤트 처리
+    for (String line : (Iterable<String>) stream::iterator) {
+        if (line.startsWith("data: ")) {
+            String jsonData = line.substring(6);
+            SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+
+            switch (event.type()) {
+                case "error":
+                    if (event.error() != null) {
+                        log.error("AI 서버 에러: {}", event.error().message());
+                        throw new AIServerException(event.error().message());
+                    }
+                    break;
+
+                case "response.output_text.delta":
+                    // 클라이언트에게 delta 전달
+                    emitter.send(SseEmitter.event()
+                            .name("delta")
+                            .data(event.delta()));
+                    break;
+            }
+        }
+    }
+
+    emitter.complete();
+
+} catch (IOException e) {
+    log.error("SSE 통신 에러: {}", e.getMessage(), e);
+    emitter.completeWithError(new AIServerException("SSE 연결 실패", e));
+}
+```
+
+**SSE 에러 처리 포인트**:
+1. **연결 단계**: IOException (네트워크 에러)
+2. **파싱 단계**: JsonProcessingException (잘못된 JSON)
+3. **이벤트 단계**: AIServerException (AI 서버가 보낸 error 이벤트)
+4. **전송 단계**: IOException (클라이언트 연결 끊김)
+
+## 8. 체크리스트
 
 새로운 에러 처리가 필요할 때 다음을 확인하세요:
 
@@ -588,6 +830,13 @@ logging:
 - [ ] 컨트롤러는 예외를 처리하지 않고 `GlobalExceptionHandler`에 위임
 - [ ] 인증 전/후 보안 원칙 준수
 - [ ] 응답은 항상 `ApiResponse`로 래핑
+
+**외부 서비스 통신 시 추가 확인**:
+- [ ] 세분화된 예외 처리 (IOException, JsonProcessingException, etc.)
+- [ ] block() 사용 시 명시적 타임아웃 설정
+- [ ] 외부 서비스 실패 시 보상 트랜잭션 구현
+- [ ] SSE 스트리밍 시 중간 에러 처리
+- [ ] 스트림 변환 예외 (IllegalStateException) 처리
 ### 시스템 상태 예외 대응
 
 토큰 해싱 등 내부 인프라 의존 로직에서 `NoSuchAlgorithmException` 등으로 시스템 상태가 불일치할 경우,
