@@ -16,6 +16,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.concurrent.DelegatingSecurityContextRunnable;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -48,8 +50,10 @@ public class ChatMessageController {
 
         SseEmitter emitter = new SseEmitter(5 * 60 * 1000L); // 5분 타임아웃
 
-        // 비동기로 메시지 전송 처리
-        messageService.sendMessageAsync(roomId, request, emitter);
+        // SecurityContext를 명시적으로 비동기 작업에 전파
+        Runnable task = () -> messageService.sendMessage(roomId, request, emitter);
+        Runnable securityContextTask = new DelegatingSecurityContextRunnable(task, SecurityContextHolder.getContext());
+        Thread.ofVirtual().start(securityContextTask);
 
         return emitter;
     }

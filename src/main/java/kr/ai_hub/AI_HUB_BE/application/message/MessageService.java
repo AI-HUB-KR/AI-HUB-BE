@@ -105,37 +105,6 @@ public class MessageService {
     }
 
     /**
-     * 메시지 전송 요청을 비동기로 처리합니다 (Virtual Thread 사용).
-     * 이 메서드는 SecurityContext를 사용하여 인증된 사용자 정보에 접근합니다.
-     *
-     * <p>
-     * 문제 해결 (2025-11-19):
-     * - SseEmitter 반환 시 WebAsyncManager가 비동기 디스패치를 시작
-     * - 이 메서드를 직접 호출하여 SecurityContext를 동기적으로 보존
-     * - @Transactional(readOnly=true) 설정으로 트랜잭션 컨텍스트도 유지
-     * </p>
-     *
-     * @param roomId  채팅방 ID
-     * @param request 메시지 전송 요청
-     * @param emitter SSE Emitter
-     */
-    public void sendMessageAsync(UUID roomId, SendMessageRequest request, SseEmitter emitter) {
-        // 현재 스레드의 SecurityContext와 User 정보 캡처 (동기 컨텍스트에서)
-        Integer userId = securityContextHelper.getCurrentUserId();
-
-        // Virtual Thread에서 비동기 실행
-        Thread.ofVirtual().start(() -> {
-            log.debug("Virtual Thread에서 메시지 전송 시작: roomId={}, userId={}, threadName={}",
-                    roomId, userId, Thread.currentThread().getName());
-            try {
-                sendMessage(roomId, request, emitter);
-            } catch (Exception e) {
-                log.error("비동기 메시지 전송 중 예상치 못한 에러: {}", e.getMessage(), e);
-            }
-        });
-    }
-
-    /**
      * 메시지를 전송하고 AI 응답을 SSE로 스트리밍합니다.
      * 리팩토링된 오케스트레이션 메서드 - 각 단계별 책임을 분리된 메서드에 위임합니다.
      *
