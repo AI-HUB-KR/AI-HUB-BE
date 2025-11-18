@@ -49,7 +49,7 @@ public class ChatMessageController {
         SseEmitter emitter = new SseEmitter(5 * 60 * 1000L); // 5분 타임아웃
 
         // 비동기로 메시지 전송 처리
-        messageService.sendMessage(roomId, request, emitter);
+        messageService.sendMessageAsync(roomId, request, emitter);
 
         return emitter;
     }
