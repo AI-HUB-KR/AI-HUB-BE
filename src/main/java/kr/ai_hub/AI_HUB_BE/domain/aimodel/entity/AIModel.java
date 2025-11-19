@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ai_model")
+@Table(name = "ai_model", indexes = {
+    @Index(name = "idx_ai_model_name", columnList = "model_name"),
+    @Index(name = "idx_ai_model_is_active", columnList = "is_active")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

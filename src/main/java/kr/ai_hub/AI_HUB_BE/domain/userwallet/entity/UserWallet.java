@@ -12,7 +12,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "user_wallet")
+@Table(name = "user_wallet", indexes = {
+    @Index(name = "idx_user_wallet_user", columnList = "user_id")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

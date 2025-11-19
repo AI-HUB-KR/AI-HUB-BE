@@ -13,7 +13,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "coin_transaction")
+@Table(name = "coin_transaction", indexes = {
+    @Index(name = "idx_coin_tx_user_created", columnList = "user_id, created_at"),
+    @Index(name = "idx_coin_tx_user_type", columnList = "user_id, transaction_type"),
+    @Index(name = "idx_coin_tx_user_type_created", columnList = "user_id, transaction_type, created_at"),
+    @Index(name = "idx_coin_tx_created_at", columnList = "created_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

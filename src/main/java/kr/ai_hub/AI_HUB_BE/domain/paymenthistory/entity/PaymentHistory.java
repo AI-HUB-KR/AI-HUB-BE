@@ -13,7 +13,13 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "payment_history")
+@Table(name = "payment_history", indexes = {
+    @Index(name = "idx_payment_transaction_id", columnList = "transaction_id"),
+    @Index(name = "idx_payment_user_created", columnList = "user_id, created_at"),
+    @Index(name = "idx_payment_user_status", columnList = "user_id, status"),
+    @Index(name = "idx_payment_status", columnList = "status"),
+    @Index(name = "idx_payment_created_at", columnList = "created_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

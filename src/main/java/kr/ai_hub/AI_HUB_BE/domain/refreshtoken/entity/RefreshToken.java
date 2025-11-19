@@ -10,7 +10,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "refresh_token")
+@Table(name = "refresh_token", indexes = {
+    @Index(name = "idx_refresh_token_hash", columnList = "token_hash"),
+    @Index(name = "idx_refresh_token_user_revoked", columnList = "user_id, is_revoked"),
+    @Index(name = "idx_refresh_token_expires_at", columnList = "expires_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

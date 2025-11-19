@@ -13,7 +13,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "message")
+@Table(name = "message", indexes = {
+    @Index(name = "idx_message_room_created", columnList = "room_id, created_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

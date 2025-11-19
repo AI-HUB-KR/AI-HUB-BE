@@ -9,7 +9,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "\"user\"")
+@Table(name = "\"user\"", indexes = {
+    @Index(name = "idx_user_email", columnList = "email"),
+    @Index(name = "idx_user_kakao_id", columnList = "kakao_id"),
+    @Index(name = "idx_user_username", columnList = "username"),
+    @Index(name = "idx_user_is_deleted", columnList = "is_deleted")
+})
 @EntityListeners(AuditingEntityListener.class)
 @SQLRestriction("is_deleted = false")
 @Getter
