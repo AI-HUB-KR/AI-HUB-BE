@@ -1,11 +1,13 @@
 package kr.ai_hub.AI_HUB_BE.domain.user.entity;
 
 import jakarta.persistence.*;
+import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -68,4 +70,19 @@ public class User {
         this.username = username;
         this.email = email;
     }
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private UserWallet wallet;
+
+    @PostPersist  // DB INSERT 직후 실행
+      private void createWallet() {
+          if (this.wallet == null) {
+              this.wallet = UserWallet.builder()
+                  .user(this)
+                  .balance(BigDecimal.ZERO)
+                  .totalPurchased(BigDecimal.ZERO)
+                  .totalUsed(BigDecimal.ZERO)
+                  .build();
+          }
+      }
 }
