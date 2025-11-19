@@ -26,6 +26,8 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `title` (VARCHAR(30)): 채팅방 제목
   - `coin_usage` (DECIMAL(20,10)): 코인 사용량
   - `created_at`, `updated_at` (TIMESTAMP): 생성/수정 시간
+- **비고**:
+  - 도메인 메서드: `addCoinUsage(BigDecimal amount)` - 코인 사용량 누적
 - **관계**: User와 N:1 관계 (cascade delete)
 
 #### 3. Message (메시지)
@@ -33,13 +35,18 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **주요 필드**:
   - `message_id` (UUID, PK): 메시지 고유 ID (UUIDv7)
   - `room_id` (UUID, FK): 채팅방 ID
-  - `role` (VARCHAR(10)): 역할 (user/assistant)
+  - `role` (VARCHAR(10)): 역할 (MessageRole Enum: USER, ASSISTANT)
   - `content` (TEXT): 메시지 내용
-  - `file_url` (VARCHAR(500)): 첨부 파일 URL
+  - `file_url` (VARCHAR(500)): 첨부 파일 URL (AI 서버 파일 ID)
   - `token_count` (DECIMAL(20,10)): 토큰 수
   - `coin_count` (DECIMAL(20,10)): 코인 수
   - `model_id` (INT, FK): AI 모델 ID
+  - `response_id` (VARCHAR(100)): AI 서버 응답 ID (대화 연결용)
   - `created_at` (TIMESTAMP): 생성 시간
+- **비고**:
+  - `role` 필드는 MessageRole Enum (USER, ASSISTANT)을 사용하며, DB에는 "user", "assistant" 문자열로 저장됨
+  - `response_id`는 AI 서버가 생성한 응답 ID로, 대화 맥락 연결에 사용됨
+  - 도메인 메서드: `updateTokenAndCoin()`, `updateResponseId()`
 - **관계**:
   - ChatRoom과 N:1 관계 (cascade delete)
   - AIModel과 N:1 관계

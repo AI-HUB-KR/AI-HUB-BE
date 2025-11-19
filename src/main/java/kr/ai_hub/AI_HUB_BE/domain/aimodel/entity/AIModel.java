@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ai_model")
+@Table(name = "ai_model", indexes = {
+    @Index(name = "idx_ai_model_name", columnList = "model_name"),
+    @Index(name = "idx_ai_model_is_active", columnList = "is_active")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -49,4 +52,24 @@ public class AIModel {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public void update(String displayName, String displayExplain,
+                       BigDecimal inputPricePer1m, BigDecimal outputPricePer1m,
+                       Boolean isActive) {
+        if (displayName != null) {
+            this.displayName = displayName;
+        }
+        if (displayExplain != null) {
+            this.displayExplain = displayExplain;
+        }
+        if (inputPricePer1m != null) {
+            this.inputPricePer1m = inputPricePer1m;
+        }
+        if (outputPricePer1m != null) {
+            this.outputPricePer1m = outputPricePer1m;
+        }
+        if (isActive != null) {
+            this.isActive = isActive;
+        }
+    }
 }

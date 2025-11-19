@@ -47,6 +47,17 @@ public class CookieService {
     }
 
 
+    // 쿠키에서 Access토큰 찾아서 반환
+    public String findAccessTokenFromCookie(HttpServletRequest request) {
+        Cookie accessTokenCookie = WebUtils.getCookie(request, "accessToken");
+        if (accessTokenCookie == null || !StringUtils.hasText(accessTokenCookie.getValue())) {
+            log.debug("액세스 토큰 쿠키가 없음");
+            return null;
+        }
+
+        return accessTokenCookie.getValue();
+    }
+
     // 쿠키에서 Refresh토큰 찾아서 반환
     public Cookie findRefreshTokenCookie(HttpServletRequest request) {
         Cookie refreshTokenCookie = WebUtils.getCookie(request, "refreshToken");

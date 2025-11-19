@@ -30,6 +30,8 @@ public class SecurityConfig {
     @Value("${deployment.address}")
     private String deploymentAddress;
 
+    @Value("${cors.allowed-origins}")
+    private String[] allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,7 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll() // H2 Console 허용
                         .requestMatchers("/login", "/oauth2/**", "/ws/info/**", "/api/token/refresh",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/favicon.ico").permitAll()//허용하는 경로
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/ws/**").permitAll() // OPTIONS 요청 허용
+                        // 모든 OPTIONS 요청 허용 (CORS preflight)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -61,8 +64,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOrigin("http://localhost:5173"); // 프론트엔드 로컬 개발 환경
-        configuration.addAllowedOrigin(deploymentAddress); // 백엔드 배포 환경 주소
+
+        // 설정 파일에서 읽어온 allowed origins 추가 (프로필별로 다르게 설정 가능)
+        for (String origin : allowedOrigins) {
+            configuration.addAllowedOrigin(origin.trim());
+        }
+
         configuration.addAllowedMethod("*"); // 모든 HTTP 메서드 허용 (GET, POST, PUT, DELETE 등)
         configuration.addAllowedHeader("*"); // 모든 헤더 허용
         configuration.setAllowCredentials(true); // 쿠키 포함 요청 허용 (credentials: include)

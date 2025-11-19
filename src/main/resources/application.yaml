@@ -2,6 +2,11 @@ spring:
   application:
     name: AI-HUB-BE
 
+  # Virtual Threads Configuration (Java 21+)
+  threads:
+    virtual:
+      enabled: true
+
   # DataSource Configuration
   # 환경변수가 없으면 H2 인메모리 DB를 PostgreSQL 모드로 사용
   datasource:
@@ -15,18 +20,21 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  # H2 웹 콘솔 활성화 (http://localhost:8080/h2-console)
 
   # JPA Configuration
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         ddl-auto: ${JPA_DDL_AUTO:create-drop}
         format_sql: true
         use_sql_comments: true
+        # N+1 문제 해결을 위한 Batch Fetch Size 설정
+        default_batch_fetch_size: 100
         jdbc:
           batch_size: 20
         order_inserts: true
@@ -66,18 +74,42 @@ jwt:
     access: ${JWT_EXPIRATION_SECOND:7200}
     refresh: ${JWT_REFRESH_EXPIRATION_SECOND:604800}
 
+# CORS Configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8080}
+
+# AI Server Configuration
+ai-server:
+  url: ${AI_SERVER_URL:http://localhost:3000}
+
 # Logging Configuration
 logging:
   level:
     root: INFO
+    # 우리 앱 패키지만 INFO 또는 WARN
     kr.ai_hub.AI_HUB_BE: DEBUG
-    org.springframework.web: DEBUG
+
+    # Web / Security / Hibernate는 INFO 이상으로
+    org.springframework.web: INFO
     org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate: WARN
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: INFO
+
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
   file:
     name: logs/ai-hub.log
-    max-size: 10MB
-    max-history: 30
+
+# Swagger/OpenAPI Configuration
+# http://localhost:8080/swagger-ui/index.html
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: false

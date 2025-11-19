@@ -3,6 +3,8 @@ package kr.ai_hub.AI_HUB_BE.domain.cointransaction.repository;
 import kr.ai_hub.AI_HUB_BE.domain.chatroom.entity.ChatRoom;
 import kr.ai_hub.AI_HUB_BE.domain.cointransaction.entity.CoinTransaction;
 import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -25,4 +27,12 @@ public interface CoinTransactionRepository extends JpaRepository<CoinTransaction
     List<CoinTransaction> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 
     List<CoinTransaction> findByUserAndCreatedAtBetween(User user, LocalDateTime startDate, LocalDateTime endDate);
+
+    Page<CoinTransaction> findByUser(User user, Pageable pageable);
+
+    Page<CoinTransaction> findByUserAndTransactionType(User user, String transactionType, Pageable pageable);
+
+    Page<CoinTransaction> findByUserAndCreatedAtBetween(User user, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    Page<CoinTransaction> findByUserAndTransactionTypeAndCreatedAtBetween(User user, String transactionType, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
 }

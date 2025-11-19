@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "chat_room")
+@Table(name = "chat_room", indexes = {
+    @Index(name = "idx_chat_room_user", columnList = "user_id"),
+    @Index(name = "idx_chat_room_user_created", columnList = "user_id, created_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -44,4 +47,19 @@ public class ChatRoom {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
+
+    /**
+     * 코인 사용량을 증가시킵니다.
+     *
+     * @param amount 증가시킬 코인 양
+     */
+    public void addCoinUsage(BigDecimal amount) {
+        if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+            this.coinUsage = this.coinUsage.add(amount);
+        }
+    }
 }

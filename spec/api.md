@@ -58,15 +58,45 @@
 - **500 Internal Server Error**: 서버 내부 오류
 - **503 Service Unavailable**: 서비스 이용 불가
 
-### 인증 헤더 형식
+### 인증 방식
 
+#### 방식 1: Authorization 헤더 (권장)
 토큰 기반 인증이 필요한 모든 엔드포인트는 아래 형식의 헤더를 포함해야 합니다.
 
 ```http
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-리프레시 토큰을 쿠키에 담아 전송하는 경우 별도의 본문은 필요하지 않습니다.
+**사용 예시**: 웹 애플리케이션, 모바일 앱, SPA(Single Page Application)
+
+#### 방식 2: 쿠키 기반 인증 (선택)
+Access Token을 HttpOnly 쿠키로 저장하여 자동 인증을 지원합니다.
+
+```http
+Cookie: accessToken=<ACCESS_TOKEN>
+```
+
+**특징**:
+- XSS 공격 방지: HttpOnly 플래그로 JavaScript에서 접근 불가
+- CSRF 공격 방지: SameSite=Strict 설정
+- 자동 전송: 브라우저가 자동으로 쿠키를 요청에 포함
+- 명시적 저장 불필요: 쿠키 자동 관리
+
+**사용 예시**: 전통적인 웹 애플리케이션, 서버 사이드 렌더링
+
+#### Refresh Token 갱신
+리프레시 토큰 갱신 API (`POST /api/v1/auth/token/refresh`)를 호출하면:
+- **요청**: refreshToken 쿠키 자동 전송 (별도 본문 불필요)
+- **응답**: 새로운 Access Token을 HttpOnly 쿠키로 설정
+
+```http
+# 요청
+POST /api/v1/auth/token/refresh
+Cookie: refreshToken=<REFRESH_TOKEN>
+
+# 응답 헤더
+Set-Cookie: accessToken=<NEW_ACCESS_TOKEN>; HttpOnly; Secure; SameSite=Strict
+```
 
 ### 에러 코드 정의
 
@@ -1089,9 +1119,9 @@ Content-Type: application/json
   ```
 
 #### 메시지 목록 조회
-- **Method**: GET `/api/v1/chat-rooms/{roomId}/messages`
+- **Method**: GET `/api/v1/messages/page/{roomId}`
 - **설명**: 특정 채팅방의 메시지를 페이지네이션하여 조회합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수 (Bearer Token 또는 쿠키)
 
 **요청 헤더**
 ```http
@@ -1184,7 +1214,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 #### 메시지 상세 조회
 - **Method**: GET `/api/v1/messages/{messageId}`
 - **설명**: 특정 메시지의 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수 (Bearer Token 또는 쿠키)
 
 **요청 헤더**
 ```http
@@ -1257,6 +1287,209 @@ Authorization: Bearer <ACCESS_TOKEN>
   }
   ```
 
+#### 파일 업로드
+- **Method**: POST `/api/v1/messages/files/upload`
+- **설명**: AI 서버에 파일을 업로드하고 file ID를 반환받습니다.
+- **인증**: 필수 (Bearer Token 또는 쿠키)
+
+**요청 헤더**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: multipart/form-data
+```
+
+**요청 바디 (Multipart Form Data)**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| file | File | Y | 업로드할 파일 (jpg, jpeg, png, webp, 최대 10MB) |
+| modelId | integer | Y | AI 모델 ID |
+
+**성공 응답**
+- **201 Created**
+  ```json
+  {
+    "success": true,
+    "detail": {
+      "fileId": "file-abc123xyz"
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+**응답 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| detail.fileId | string | AI 서버가 발급한 파일 ID (메시지 전송 시 사용) |
+
+**오류 응답 예시**
+- **400 Bad Request**: 파일 검증 실패
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "VALIDATION_ERROR",
+      "message": "파일 크기가 너무 큽니다. 최대 크기: 10MB",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **404 Not Found**: 모델 없음
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "MODEL_NOT_FOUND",
+      "message": "AI 모델을 찾을 수 없습니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **502 Bad Gateway**: AI 서버 통신 실패
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "AI_SERVER_ERROR",
+      "message": "AI 서버와의 통신에 실패했습니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+#### 메시지 전송 (SSE 스트리밍)
+- **Method**: POST `/api/v1/messages/send/{roomId}`
+- **설명**: 채팅방에 메시지를 전송하고 AI 응답을 SSE(Server-Sent Events)로 실시간 스트리밍합니다.
+- **인증**: 필수 (Bearer Token 또는 쿠키)
+- **응답 형식**: text/event-stream
+
+**요청 헤더**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+**경로 변수**
+
+| 변수 | 타입 | 설명 |
+|------|------|------|
+| roomId | string | 메시지를 전송할 채팅방 UUID |
+
+**요청 바디**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| message | string | Y | 전송할 메시지 내용 (공백 제외 1자 이상) |
+| modelId | integer | Y | 사용할 AI 모델 ID |
+| fileId | string | N | 첨부 파일 ID (파일 업로드 API로 받은 ID) |
+| previousResponseId | string | N | 이전 대화 응답 ID (대화 맥락 연결용) |
+
+**요청 예시**
+```json
+{
+  "message": "안녕하세요, GPT-4!",
+  "modelId": 1,
+  "fileId": "file-abc123xyz",
+  "previousResponseId": "resp-xyz789"
+}
+```
+
+**SSE 이벤트 스트림**
+
+1. **started** 이벤트 (연결 확인)
+   ```
+   event: started
+   data: Message sending started
+   ```
+
+2. **delta** 이벤트 (응답 텍스트 조각, 여러 번 전송됨)
+   ```
+   event: delta
+   data: 안녕하세요!
+
+   event: delta
+   data:  반갑습니다.
+   ```
+
+3. **completed** 이벤트 (응답 완료)
+   ```
+   event: completed
+   data: {"userMessageId":"uuid-v7","aiResponseId":"resp-123","inputTokens":10,"outputTokens":20}
+   ```
+
+**SSE completed 이벤트 데이터 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| userMessageId | string | 저장된 사용자 메시지 UUID |
+| aiResponseId | string | AI 서버 응답 ID (다음 대화 연결용) |
+| inputTokens | integer | 입력 토큰 수 |
+| outputTokens | integer | 출력 토큰 수 |
+
+**비즈니스 로직**
+- User 메시지를 먼저 DB에 저장 (별도 트랜잭션)
+- AI 서버에서 응답을 SSE 스트리밍으로 수신하며 클라이언트에 전달
+- 응답 완료 후:
+  - 토큰 수 기반 코인 계산: `(tokens / 1,000,000) * price_per_1M`
+  - 사용자 지갑에서 코인 차감
+  - Assistant 메시지 DB에 저장
+  - User 메시지에 responseId, 토큰, 코인 정보 업데이트
+  - ChatRoom의 coinUsage 업데이트
+  - CoinTransaction 기록 생성
+
+**오류 응답**
+- SSE 연결은 오류 발생 시 종료됩니다
+- **404 Not Found**: 채팅방 또는 모델 없음
+- **403 Forbidden**: 채팅방 접근 권한 없음
+- **400 Bad Request**: 잔액 부족 또는 검증 실패
+- **502 Bad Gateway**: AI 서버 통신 실패
+
+**오류 예시 (일반 JSON 응답)**
+```json
+{
+  "success": false,
+  "detail": {
+    "code": "INSUFFICIENT_BALANCE",
+    "message": "코인 잔액이 부족합니다.",
+    "details": null
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**사용 예시 (JavaScript)**
+```javascript
+const eventSource = new EventSource('/api/v1/messages/send/room-uuid', {
+  headers: {
+    'Authorization': 'Bearer ' + token
+  }
+});
+
+eventSource.addEventListener('started', (e) => {
+  console.log('Connection started:', e.data);
+});
+
+eventSource.addEventListener('delta', (e) => {
+  console.log('Response chunk:', e.data);
+  // UI에 텍스트 추가
+});
+
+eventSource.addEventListener('completed', (e) => {
+  const data = JSON.parse(e.data);
+  console.log('Response completed:', data);
+  eventSource.close();
+});
+
+eventSource.addEventListener('error', (e) => {
+  console.error('SSE error:', e);
+  eventSource.close();
+});
+```
+
 ### 5. AI 모델 (AIModel)
 
 #### AI 모델 목록 조회
@@ -1275,11 +1508,11 @@ Authorization: Bearer <ACCESS_TOKEN>
         "modelName": "gpt-4",
         "displayName": "GPT-4",
         "displayExplain": "OpenAI의 최신 대화형 AI 모델",
-        "inputPricePer1k": 0.03,
-        "outputPricePer1k": 0.06,
-        "averagePricePer1k": 0.045,
+        "inputPricePer1m": 0.03,
+        "outputPricePer1m": 0.06,
         "isActive": true,
-        "createdAt": "2025-01-01T00:00:00Z"
+        "createdAt": "2025-01-01T00:00:00Z",
+        "updatedAt": "2025-01-01T00:00:00Z"
       }
     ],
     "timestamp": "2025-01-01T00:00:00Z"
@@ -1294,11 +1527,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 | detail[].modelName | string | 내부 모델 식별자 |
 | detail[].displayName | string | 사용자 표시 이름 |
 | detail[].displayExplain | string | 모델 설명 |
-| detail[].inputPricePer1k | number | 입력 1k 토큰당 가격 |
-| detail[].outputPricePer1k | number | 출력 1k 토큰당 가격 |
-| detail[].averagePricePer1k | number | 평균 가격 |
+| detail[].inputPricePer1m | number | 입력 1m 토큰당 가격 |
+| detail[].outputPricePer1m | number | 출력 1m 토큰당 가격 |
 | detail[].isActive | boolean | 활성화 여부 |
-| detail[].createdAt | string | 생성 시각 |
+| detail[].createdAt | string | 생성 시각 (ISO 8601) |
+| detail[].updatedAt | string | 수정 시각 (ISO 8601) |
 
 **오류 응답 예시**
 - **503 Service Unavailable**: 가격 데이터 동기화 실패
@@ -1335,8 +1568,8 @@ Authorization: Bearer <ACCESS_TOKEN>
       "modelName": "gpt-4",
       "displayName": "GPT-4",
       "displayExplain": "OpenAI의 최신 대화형 AI 모델",
-      "inputPricePer1k": 0.03,
-      "outputPricePer1k": 0.06,
+      "inputPricePer1m": 0.03,
+      "outputPricePer1m": 0.06,
       "isActive": true,
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
@@ -1353,11 +1586,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 | detail.modelName | string | 내부 모델 식별자 |
 | detail.displayName | string | 사용자 표시 이름 |
 | detail.displayExplain | string | 모델 설명 |
-| detail.inputPricePer1k | number | 입력 1k 토큰당 가격 |
-| detail.outputPricePer1k | number | 출력 1k 토큰당 가격 |
+| detail.inputPricePer1m | number | 입력 1m 토큰당 가격 |
+| detail.outputPricePer1m | number | 출력 1m 토큰당 가격 |
 | detail.isActive | boolean | 활성화 여부 |
-| detail.createdAt | string | 생성 시각 |
-| detail.updatedAt | string | 수정 시각 |
+| detail.createdAt | string | 생성 시각 (ISO 8601) |
+| detail.updatedAt | string | 수정 시각 (ISO 8601) |
 
 **오류 응답 예시**
 - **404 Not Found**: 모델 없음
@@ -1390,8 +1623,8 @@ Content-Type: application/json
   "modelName": "gpt-4-turbo",
   "displayName": "GPT-4 Turbo",
   "displayExplain": "더 빠르고 저렴한 GPT-4",
-  "inputPricePer1k": 0.01,
-  "outputPricePer1k": 0.03,
+  "inputPricePer1m": 0.01,
+  "outputPricePer1m": 0.03,
   "isActive": true
 }
 ```
@@ -1403,8 +1636,8 @@ Content-Type: application/json
 | modelName | string | ✅ | 시스템 내부 모델 식별자 | 소문자, 하이픈 허용 |
 | displayName | string | ✅ | 프런트 표시 이름 | 최대 30자 |
 | displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1k | number | ✅ | 입력 1k 토큰당 USD 가격 | 0 이상 |
-| outputPricePer1k | number | ✅ | 출력 1k 토큰당 USD 가격 | 0 이상 |
+| inputPricePer1m | number | ✅ | 입력 1m 토큰당 USD 가격 | 0 이상 |
+| outputPricePer1m | number | ✅ | 출력 1m 토큰당 USD 가격 | 0 이상 |
 | isActive | boolean | ✅ | 활성화 여부 | - |
 
 **성공 응답**
@@ -1417,8 +1650,8 @@ Content-Type: application/json
       "modelName": "gpt-4-turbo",
       "displayName": "GPT-4 Turbo",
       "displayExplain": "더 빠르고 저렴한 GPT-4",
-      "inputPricePer1k": 0.01,
-      "outputPricePer1k": 0.03,
+      "inputPricePer1m": 0.01,
+      "outputPricePer1m": 0.03,
       "isActive": true,
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
@@ -1477,8 +1710,8 @@ Content-Type: application/json
 {
   "displayName": "GPT-4 Turbo",
   "displayExplain": "업데이트된 설명",
-  "inputPricePer1k": 0.01,
-  "outputPricePer1k": 0.03,
+  "inputPricePer1m": 0.01,
+  "outputPricePer1m": 0.03,
   "isActive": true
 }
 ```
@@ -1489,8 +1722,8 @@ Content-Type: application/json
 |------|------|------|------|----------|
 | displayName | string | ❌ | 사용자 표시 이름 | 최대 30자 |
 | displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1k | number | ❌ | 입력 1k 토큰당 가격 | 0 이상 |
-| outputPricePer1k | number | ❌ | 출력 1k 토큰당 가격 | 0 이상 |
+| inputPricePer1m | number | ❌ | 입력 1m 토큰당 가격 | 0 이상 |
+| outputPricePer1m | number | ❌ | 출력 1m 토큰당 가격 | 0 이상 |
 | isActive | boolean | ❌ | 활성화 여부 | - |
 
 **성공 응답**
@@ -1503,8 +1736,8 @@ Content-Type: application/json
       "modelName": "gpt-4",
       "displayName": "GPT-4 Turbo",
       "displayExplain": "업데이트된 설명",
-      "inputPricePer1k": 0.01,
-      "outputPricePer1k": 0.03,
+      "inputPricePer1m": 0.01,
+      "outputPricePer1m": 0.03,
       "isActive": true,
       "createdAt": "2024-12-01T00:00:00Z",
       "updatedAt": "2025-01-02T00:00:00Z"
@@ -1535,7 +1768,7 @@ Content-Type: application/json
     "detail": {
       "code": "VALIDATION_ERROR",
       "message": "가격은 0 이상이어야 합니다.",
-      "details": "inputPricePer1k=-0.1"
+      "details": "inputPricePer1m=-0.1"
     },
     "timestamp": "2025-01-01T00:00:00Z"
   }
@@ -2317,7 +2550,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 #### 모델별 가격 대시보드
 - **Method**: GET `/api/v1/dashboard/models/pricing`
-- **설명**: 모든 활성화된 AI 모델의 1,000토큰당 USD 가격 정보를 조회합니다.
+- **설명**: 모든 활성화된 AI 모델의 1,000,000토큰당 USD 가격 정보를 조회합니다.
 - **인증**: Public
 
 **성공 응답**
@@ -2330,9 +2563,8 @@ Authorization: Bearer <ACCESS_TOKEN>
         "modelId": 1,
         "modelName": "gpt-4",
         "displayName": "GPT-4",
-        "inputPricePer1k": 0.03,
-        "outputPricePer1k": 0.06,
-        "averagePricePer1k": 0.045,
+        "inputPricePer1m": 0.03,
+        "outputPricePer1m": 0.06,
         "isActive": true
       }
     ],
