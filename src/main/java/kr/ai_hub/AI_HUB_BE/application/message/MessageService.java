@@ -213,48 +213,58 @@ public class MessageService {
         var stream = aiServerWebClient.post()
                 .uri("/ai/chat")
                 .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
                 .toStream();
 
         for (String line : (Iterable<String>) stream::iterator) {
-            if (line.startsWith("data: ")) {
-                String jsonData = line.substring(6);
-                SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+            if (line == null || line.isBlank()) {
+                continue;
+            }
+            SseEvent event = objectMapper.readValue(line, SseEvent.class);
 
-                switch (event.type()) {
-                    case "response.created":
-                        if (event.response() != null) {
-                            aiResponseId = event.response().id();
-                            log.debug("AI 응답 생성: id={}", aiResponseId);
-                        }
-                        break;
+            switch (event.type()) {
+                case "response.created":
+                    log.info("AI 서버 response.created 이벤트 수신");
+                    if (event.response() != null) {
+                        aiResponseId = event.response().id();
+                        log.debug("AI 응답 생성: id={}", aiResponseId);
+                    }
+                    break;
 
-                    case "response.output_text.delta":
-                        if (event.delta() != null) {
-                            fullContent.append(event.delta());
-                            // 클라이언트에게 delta 전달
-                            emitter.send(SseEmitter.event()
-                                    .name("delta")
-                                    .data(event.delta()));
-                        }
-                        break;
+                case "response.output_text.delta":
+                    if (event.delta() != null) {
+                        fullContent.append(event.delta());
+                        // 클라이언트에게 delta 전달
+                        emitter.send(SseEmitter.event()
+                                .name("delta")
+                                .data(event.delta()));
+                    }
+                    break;
 
-                    case "response.completed":
-                        if (event.response() != null) {
-                            usage = event.response().usage();
+                case "response.completed":
+                    log.info("AI 서버 response.completed 이벤트 수신");
+                    if (event.response() != null) {
+                        usage = event.response().usage();
+                        if (usage != null) {
                             log.info("AI 응답 완료: tokens={}", usage.totalTokens());
+                        } else {
+                            log.error("usage가 null입니다! response={}", event.response());
                         }
-                        break;
+                    } else {
+                        log.error("response 객체가 null입니다!");
+                    }
+                    break;
 
-                    case "error":
-                        if (event.error() != null) {
-                            log.error("AI 서버 에러: {}", event.error().message());
-                            throw new AIServerException(event.error().message());
-                        }
-                        break;
-                }
+                case "error":
+                    log.info("AI 서버 error 이벤트 수신");
+                    if (event.error() != null) {
+                        log.error("AI 서버 에러: {}", event.error().message());
+                        throw new AIServerException(event.error().message());
+                    }
+                    break;
             }
         }
 
