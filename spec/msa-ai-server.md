@@ -191,6 +191,8 @@ Content-Type: application/json
 | `file_id` | string | ❌ | 업로드된 이미지 파일 ID |
 | `previous_response_id` | string | ❌ | 이전 응답 ID (대화 이어가기) |
 
+> 💡 모델 정보는 쿼리 파라미터가 아니라 JSON Body의 `model` 필드로 전달됩니다.
+
 #### 성공 응답 (200 OK)
 
 응답은 SSE (Server-Sent Events) 스트림으로 전달됩니다. 각 이벤트는 `data:` 프리픽스로 시작합니다.
@@ -198,13 +200,13 @@ Content-Type: application/json
 **스트림 이벤트 예제:**
 
 ```
-data: {"type":"response.created","response":{"id":"resp_xyz123"}}
+{"type":"response.created","response":{"id":"resp_xyz123"}}
 
-data: {"type":"response.output_text.delta","delta":"안녕하세요","sequence_number":1}
+{"type":"response.output_text.delta","delta":"안녕하세요","sequence_number":1}
 
-data: {"type":"response.output_text.delta","delta":"!","sequence_number":2}
+{"type":"response.output_text.delta","delta":"!","sequence_number":2}
 
-data: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_xyz123","model":"gpt-5-mini","content":"안녕하세요!","usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}
+{"type":"response.completed","sequence_number":3,"response":{"id":"resp_xyz123","model":"gpt-5-mini","content":"안녕하세요!","usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}
 ```
 
 #### 스트림 이벤트 타입
@@ -529,4 +531,3 @@ curl -X GET "http://localhost:3000/ai/response?id=resp_abc123&model=gpt-5-mini"
 # 응답:
 # {"success": true, "data": {"id": "resp_abc123", "content": "...", "usage": {"total_tokens": 150}}}
 ```
-
