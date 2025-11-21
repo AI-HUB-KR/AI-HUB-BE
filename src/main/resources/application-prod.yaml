@@ -29,7 +29,7 @@ spring:
   # JPA Configuration (운영 환경)
   jpa:
     hibernate:
-      ddl-auto: validate  # 운영: 스키마 검증만 (변경 금지)
+      ddl-auto: update  # 운영: 스키마 검증만 (변경 금지)
     show-sql: false  # SQL 로그 비활성화
 
 # Deployment Configuration (운영 환경)
