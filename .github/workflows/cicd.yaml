@@ -68,6 +68,7 @@ jobs:
     permissions:
       contents: read      # 소스 코드 읽기
       packages: write     # GHCR에 이미지 푸시
+      id-token: write
 
     # 다음 Job에 전달할 출력값
     outputs:
