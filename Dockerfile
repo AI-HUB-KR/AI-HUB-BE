@@ -25,6 +25,9 @@ COPY gradle gradle
 COPY build.gradle .
 COPY settings.gradle .
 
+# Gradle 실행 권한 부여 (권한 누락 대비)
+RUN chmod +x gradlew
+
 # 의존성 다운로드 (캐싱 레이어)
 RUN ./gradlew dependencies --no-daemon || return 0
 
@@ -40,6 +43,9 @@ RUN mkdir -p build/extracted && \
 # Stage 2: Runtime
 # ===================================================================
 FROM eclipse-temurin:25-jre-alpine
+
+# 런타임 유틸 설치 (healthcheck용 wget)
+RUN apk add --no-cache wget
 
 # 보안 강화: non-root 사용자 생성
 RUN addgroup -S spring && adduser -S spring -G spring
