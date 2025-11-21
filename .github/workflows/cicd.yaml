@@ -168,10 +168,11 @@ jobs:
           SPRING_IMAGE: ${{ env.REGISTRY }}/${{ env.OWNER }}/main-server
         run: |
           # springApp.image의 태그를 커밋 SHA로 치환
-          perl -0pi -e "s|(springApp:\\s*.*?image:\\s*)\\S+|\\${1}$ENV{SPRING_IMAGE}:$ENV{GIT_SHA}|sg" values.yaml
-
+          yq eval ".springApp.image = \"$SPRING_IMAGE:$GIT_SHA\"" -i values.yaml
+          
+          # 변경 내용 확인
           echo "Updated springApp.image:"
-          perl -0ne 'print if $p; $p=1 if /^springApp:/; $p=0 if /^\\S/ && !/^springApp:/' values.yaml | sed -n '1,10p'
+          yq eval '.springApp' values.yaml
 
       # 3. 변경사항 커밋 및 푸시
       - name: 변경사항 커밋 및 푸시
