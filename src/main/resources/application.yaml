@@ -61,3 +61,10 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   show-actuator: false
+
+# actuator 경로 활성화
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
