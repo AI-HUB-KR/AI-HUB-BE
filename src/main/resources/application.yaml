@@ -1,3 +1,15 @@
+# ===================================================================
+# Spring Boot Application Configuration (공통 설정)
+# ===================================================================
+# 프로파일별 설정:
+#   - application-dev.yaml: 개발 환경
+#   - application-prod.yaml: 운영 환경
+#
+# 프로파일 활성화:
+#   1. IDE: Run Configuration에서 -Dspring.profiles.active=dev
+#   2. CLI: java -jar app.jar --spring.profiles.active=prod
+#   3. 환경변수: export SPRING_PROFILES_ACTIVE=prod
+# ===================================================================
 spring:
   application:
     name: AI-HUB-BE
@@ -7,30 +19,11 @@ spring:
     virtual:
       enabled: true
 
-  # DataSource Configuration
-  # 환경변수가 없으면 H2 인메모리 DB를 PostgreSQL 모드로 사용
-  datasource:
-    url: ${DB_URL:jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
-    username: ${DB_USERNAME:sa}
-    password: ${DB_PASSWORD:}
-    driver-class-name: ${DB_DRIVER:org.h2.Driver}
-
-  # H2 Console Configuration (개발 환경용)
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-  # H2 웹 콘솔 활성화 (http://localhost:8080/h2-console)
-
-  # JPA Configuration
+  # JPA 공통 설정
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    hibernate:
-      ddl-auto: update
-    show-sql: false
     properties:
       hibernate:
-        ddl-auto: ${JPA_DDL_AUTO:create-drop}
         format_sql: true
         use_sql_comments: true
         # N+1 문제 해결을 위한 Batch Fetch Size 설정
@@ -63,53 +56,8 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
-deployment:
-  address: ${DEPLOYMENT_ADDRESS:http://localhost:8080}
-  frontend:
-    redirect-url: ${FRONTEND_ADDRESS:http://localhost:3000}
-
-jwt:
-  secret: ${JWT_SECRET:default_jwt_secret_key}
-  expiration:
-    access: ${JWT_EXPIRATION_SECOND:7200}
-    refresh: ${JWT_REFRESH_EXPIRATION_SECOND:604800}
-
-# CORS Configuration
-cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8080}
-
-# AI Server Configuration
-ai-server:
-  url: ${AI_SERVER_URL:http://localhost:3000}
-
-# Logging Configuration
-logging:
-  level:
-    root: INFO
-    # 우리 앱 패키지만 INFO 또는 WARN
-    kr.ai_hub.AI_HUB_BE: DEBUG
-
-    # Web / Security / Hibernate는 INFO 이상으로
-    org.springframework.web: INFO
-    org.springframework.security: INFO
-    org.hibernate: WARN
-    org.hibernate.SQL: INFO
-    org.hibernate.type.descriptor.sql.BasicBinder: INFO
-
-  pattern:
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-  file:
-    name: logs/ai-hub.log
-
 # Swagger/OpenAPI Configuration
-# http://localhost:8080/swagger-ui/index.html
 springdoc:
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
   api-docs:
     path: /v3/api-docs
   show-actuator: false
