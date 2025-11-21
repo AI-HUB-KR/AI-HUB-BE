@@ -30,6 +30,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update  # 운영: 스키마 검증만 (변경 금지)
+      #TODO: 운영 환경에서는 스키마 변경을 자동으로 하지 않는 것이 추천됨. 필요시 수동 마이그레이션 권장.
     show-sql: false  # SQL 로그 비활성화
 
 # Deployment Configuration (운영 환경)
