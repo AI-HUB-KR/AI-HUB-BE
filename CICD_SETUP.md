@@ -174,7 +174,7 @@ on:
 > DB_URL, DB_USERNAME, DB_PASSWORD는 CloudNativePG 등에서 관리
 
 ```bash
-kubectl create secret generic ai-hub-be-secrets \
+kubectl create secret generic spring-app-secret \
   --from-literal=DEPLOYMENT_ADDRESS=https://api.aihub.com \
   --from-literal=FRONTEND_ADDRESS=https://aihub.com \
   --from-literal=JWT_SECRET=your-super-strong-secret-key \
