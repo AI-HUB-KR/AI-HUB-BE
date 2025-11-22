@@ -28,3 +28,9 @@ deployment:
 
 cors:
   allowed-origins: http://localhost:3000
+
+# 테스트용 쿠키 설정 (CookieService @Value 주입용)
+cookie:
+  domain: ""
+  secure: false
+  same-site: Lax
