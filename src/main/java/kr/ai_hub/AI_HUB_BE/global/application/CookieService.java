@@ -19,6 +19,15 @@ import java.time.Duration;
 @Service
 public class CookieService {
 
+    @Value("${cookie.domain:}")
+    private String cookieDomain;
+
+    @Value("${cookie.secure}")
+    private boolean cookieSecure;
+
+    @Value("${cookie.same-site}")
+    private String cookieSameSite;
+
     @Value("${jwt.expiration.access}")
     private long accessValidityInSeconds;
 
@@ -31,14 +40,18 @@ public class CookieService {
                 .httpOnly(true)
                 .path("/")
                 .maxAge(Duration.ofSeconds(accessValidityInSeconds))
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
+                .secure(cookieSecure)
+                .domain(cookieDomain)
                 .build();
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .path("/api/token/refresh") // Refresh 엔드포인트에서만 사용 가능
+                .path("/api/token/refresh")
                 .maxAge(Duration.ofSeconds(refreshValidityInSeconds))
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
+                .secure(cookieSecure)
+                .domain(cookieDomain)
                 .build();
 
         // [쿠키] 응답에 담기

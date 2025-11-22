@@ -1,15 +1,4 @@
-# ===================================================================
 # Spring Boot Application Configuration (공통 설정)
-# ===================================================================
-# 프로파일별 설정:
-#   - application-dev.yaml: 개발 환경
-#   - application-prod.yaml: 운영 환경
-#
-# 프로파일 활성화:
-#   1. IDE: Run Configuration에서 -Dspring.profiles.active=dev
-#   2. CLI: java -jar app.jar --spring.profiles.active=prod
-#   3. 환경변수: export SPRING_PROFILES_ACTIVE=prod
-# ===================================================================
 spring:
   application:
     name: AI-HUB-BE
