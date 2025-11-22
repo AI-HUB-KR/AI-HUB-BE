@@ -11,8 +11,8 @@ on:
 
 env:
   REGISTRY: ghcr.io                        # GitHub Container Registry
-  OWNER: ${{ toLower(github.repository_owner) }}    # 조직/사용자 자동 참조
-  IMAGE_NAME: ${{ toLower(github.repository_owner) }}/main-server  # Helm values의 springApp.image와 일치하도록 설정
+  OWNER: ${{ github.repository_owner }}    # 조직/사용자 자동 참조
+  IMAGE_NAME: ${{ github.repository_owner }}/main-server  # Helm values의 springApp.image와 일치하도록 설정
 
 jobs:
   # ===================================================================
