@@ -11,8 +11,8 @@ on:
 
 env:
   REGISTRY: ghcr.io                        # GitHub Container Registry
-  OWNER: ${{ github.repository_owner }}    # 조직/사용자 자동 참조
-  IMAGE_NAME: ${{ github.repository_owner }}/main-server  # Helm values의 springApp.image와 일치하도록 설정
+  OWNER: ${{ toLower(github.repository_owner) }}    # 조직/사용자 자동 참조
+  IMAGE_NAME: ${{ toLower(github.repository_owner) }}/main-server  # Helm values의 springApp.image와 일치하도록 설정
 
 jobs:
   # ===================================================================
@@ -167,8 +167,12 @@ jobs:
           GIT_SHA: ${{ github.sha }}
           SPRING_IMAGE: ${{ env.REGISTRY }}/${{ env.OWNER }}/main-server
         run: |
-          # springApp.image의 태그를 커밋 SHA로 치환
-          yq eval ".springApp.image = \"$SPRING_IMAGE:$GIT_SHA\"" -i values.yaml
+          # 1. 환경변수를 소문자로 변환 (Bash 내장 기능)
+          IMAGE_LOWER="${$SPRING_IMAGE,,}"
+          echo "Lowercase Image: $IMAGE_LOWER"
+          
+          # 2. 변환된 변수(IMAGE_LOWER)를 사용하여 yq 실행
+          yq eval ".nestApp.image = \"${IMAGE_LOWER}:$GIT_SHA\"" -i values.yaml
           
           # 변경 내용 확인
           echo "Updated springApp.image:"
