@@ -172,7 +172,7 @@ jobs:
           echo "Lowercase Image: $IMAGE_LOWER"
           
           # 2. 변환된 변수(IMAGE_LOWER)를 사용하여 yq 실행
-          yq eval ".nestApp.image = \"${IMAGE_LOWER}:$GIT_SHA\"" -i values.yaml
+          yq eval ".springApp.image = \"${IMAGE_LOWER}:$GIT_SHA\"" -i values.yaml
           
           # 변경 내용 확인
           echo "Updated springApp.image:"
