@@ -1,7 +1,7 @@
 # 운영 환경 프로파일 설정
 # 활성화: -Dspring.profiles.active=prod
 cookie:
-  domain: ${FRONTEND_ADDRESS}
+  domain: aihub.io.kr
   secure: true
   same-site: None
 
