@@ -74,9 +74,3 @@ logging:
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}  # 기본값: 비활성화 (필요시 환경 변수로 활성화)
-
-# 임시로 context-path를 설정하여 애플리케이션 자체가 /api 밑에서 동작하게 함.
-#TODO: 추후 변경
-server:
-  servlet:
-    context-path: /api
