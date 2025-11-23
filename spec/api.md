@@ -851,11 +851,12 @@ Authorization: Bearer <ACCESS_TOKEN>
 ### 4. 파일 업로드 (File Upload)
 
 #### 파일 업로드
-- **Method**: POST `/api/v1/files/upload`
-- **설명**: 사용자가 업로드한 파일을 Cloudflare R2에 저장하고 접근 가능한 URL을 반환합니다.
+- **Method**: POST `/api/v1/messages/files/upload`
+- **설명**: 사용자가 업로드한 파일을 AI 서버에 업로드하고 파일 ID를 반환합니다.
 - **인증**: 필수 (Bearer Token)
-- **파일 용량 제한**: 50MB제한
-- **확장자명 제한**: 이미지 (.jpg, .jpeg, .png, .gif, .webp), 문서 (.pdf, .txt, .docx, .xlsx, .pptx, .csv)
+- **파일 용량 제한**: 최대 10MB
+- **확장자명 제한**: 이미지만 지원 (.jpg, .jpeg, .png, .webp)
+- **검증**: 확장자, MIME Type, Magic Number (파일 헤더) 종합 검증
 
 **요청 헤더**
 ```http
@@ -865,18 +866,26 @@ Content-Type: multipart/form-data
 
 **요청 본문 (multipart/form-data)**
 
-```
-curl -X POST http://localhost:8080/api/v1/files/upload \
+| 필드 | 타입 | 필수 | 설명 | 제약사항 |
+|------|------|------|------|----------|
+| file | file | ✅ | 업로드할 파일 | 최대 10MB, 이미지만 허용 |
+| modelId | integer | ✅ | AI 모델 ID | 유효한 모델 ID 필요 |
+
+**cURL 예제**
+```bash
+curl -X POST http://localhost:8080/api/v1/messages/files/upload \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -F "file=@/path/to/your/file.png"
+  -F "file=@/path/to/your/image.png" \
+  -F "modelId=1"
 ```
 
 **JavaScript/Fetch 예제**
 ```javascript
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
+formData.append('modelId', 1);
 
-const response = await fetch('/api/v1/files/upload', {
+const response = await fetch('/api/v1/messages/files/upload', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${accessToken}`
@@ -885,29 +894,19 @@ const response = await fetch('/api/v1/files/upload', {
 });
 
 const data = await response.json();
-console.log(data.detail.fileUrl);
+console.log(data.detail.fileId); // "file-UkbZS1SH6KcYZkZqqemVdU"
 ```
 
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| file | file | ✅ | 업로드할 파일 | 최대 50MB, 이미지/문서만 허용 |
-
 **지원 파일 타입**
-- **이미지**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp` (최대 10MB)
-- **문서**: `.pdf`, `.txt`, `.docx` (최대 20MB)
+- **이미지**: `.jpg`, `.jpeg`, `.png`, `.webp` (최대 10MB)
 
 **성공 응답**
-- **200 OK**
+- **201 Created**
   ```json
   {
     "success": true,
     "detail": {
-      "fileUrl": "https://ai-hub-bucket.s3.amazonaws.com/uploads/2025/01/01/abc123def456.png",
-      "fileName": "screenshot.png",
-      "fileSize": 2048576,
-      "contentType": "image/png",
-      "uploadedAt": "2025-01-01T00:00:00Z",
-      "expiresAt": "2026-01-01T00:00:00Z"
+      "fileId": "file-UkbZS1SH6KcYZkZqqemVdU"
     },
     "timestamp": "2025-01-01T00:00:00Z"
   }
@@ -915,36 +914,74 @@ console.log(data.detail.fileUrl);
 
 **응답 필드**
 
-| 필드 | 타입 | 설명                            |
-|------|------|-------------------------------|
-| detail.fileUrl | string | R2에 저장된 파일의 공개 접근 URL (1년 유효) |
-| detail.fileName | string | 원본 파일명                        |
-| detail.fileSize | integer | 파일 크기 (바이트)                   |
-| detail.contentType | string | MIME 타입                       |
-| detail.uploadedAt | string | 업로드 완료 시각 (ISO 8601)          |
-| detail.expiresAt | string | URL 만료 시각 (ISO 8601)          |
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| success | boolean | 요청 성공 여부 |
+| detail.fileId | string | AI 서버에서 반환된 파일 ID (메시지 전송 시 사용) |
+| timestamp | string | 응답 생성 시간 (ISO 8601) |
 
 **오류 응답 예시**
+
 - **400 Bad Request**: 파일 검증 실패
   ```json
   {
     "success": false,
     "detail": {
       "code": "VALIDATION_ERROR",
-      "message": "지원하지 않는 파일 형식입니다.",
-      "details": "contentType=application/exe"
+      "message": "지원하지 않는 파일 형식입니다: exe. 지원되는 형식: jpg, jpeg, png, webp",
+      "details": null
     },
     "timestamp": "2025-01-01T00:00:00Z"
   }
   ```
-- **413 Payload Too Large**: 파일 크기 초과
+
+- **400 Bad Request**: 파일 크기 초과
   ```json
   {
     "success": false,
     "detail": {
       "code": "VALIDATION_ERROR",
-      "message": "파일 크기가 너무 큽니다.",
-      "details": "maxSize=52428800,uploadedSize=104857600"
+      "message": "파일 크기가 너무 큽니다. 최대 크기: 10MB",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+- **400 Bad Request**: Magic Number 검증 실패 (파일 형식 위조 감지)
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "VALIDATION_ERROR",
+      "message": "파일 형식이 일치하지 않습니다. 감지된 타입: application/octet-stream",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+- **404 Not Found**: AI 모델을 찾을 수 없음
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "MODEL_NOT_FOUND",
+      "message": "AI 모델을 찾을 수 없습니다: 999",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+- **5xx Server Error**: AI 서버 파일 업로드 실패
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "AI_SERVER_ERROR",
+      "message": "파일 업로드 중 에러가 발생했습니다: Connection timeout",
+      "details": null
     },
     "timestamp": "2025-01-01T00:00:00Z"
   }
