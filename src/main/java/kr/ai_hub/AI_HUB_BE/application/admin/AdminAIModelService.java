@@ -15,6 +15,7 @@ import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +33,9 @@ public class AdminAIModelService {
      * 새로운 AI 모델을 등록합니다 (관리자 전용).
      */
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse createModel(CreateAIModelRequest request) {
-        validateAdminRole();
+        //validateAdminRole();
         log.info("관리자 모델 생성 요청: modelName={}", request.modelName());
 
         // 모델명 중복 체크
@@ -60,8 +62,9 @@ public class AdminAIModelService {
      * AI 모델 정보를 수정합니다 (관리자 전용).
      */
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse updateModel(Integer modelId, UpdateAIModelRequest request) {
-        validateAdminRole();
+        //validateAdminRole();
         log.info("관리자 모델 수정 요청: modelId={}", modelId);
 
         AIModel model = aiModelRepository.findById(modelId)
@@ -84,8 +87,9 @@ public class AdminAIModelService {
      * AI 모델을 삭제합니다 (관리자 전용).
      */
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteModel(Integer modelId) {
-        validateAdminRole();
+        //validateAdminRole();
         log.info("관리자 모델 삭제 요청: modelId={}", modelId);
 
         AIModel model = aiModelRepository.findById(modelId)

@@ -3,15 +3,11 @@ package kr.ai_hub.AI_HUB_BE.application.chat.message;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.*;
-import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.*;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoom;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoomRepository;
-import kr.ai_hub.AI_HUB_BE.domain.payment.CoinTransaction;
-import kr.ai_hub.AI_HUB_BE.domain.payment.CoinTransactionRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.Message;
-import kr.ai_hub.AI_HUB_BE.domain.chat.MessageRole;
 import kr.ai_hub.AI_HUB_BE.domain.chat.MessageRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
@@ -26,7 +22,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -36,7 +31,6 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,7 +49,7 @@ public class MessageService {
     private final UserRepository userRepository;
     private final AIModelRepository aiModelRepository;
     private final UserWalletRepository userWalletRepository;
-    private final CoinTransactionRepository coinTransactionRepository;
+    private final MessageTransactionService messageTransactionService;
     private final SecurityContextHelper securityContextHelper;
     private final WebClient aiServerWebClient;
     private final ObjectMapper objectMapper;
@@ -121,8 +115,8 @@ public class MessageService {
             // 1. 요청 검증 및 리소스 조회
             ValidatedMessageContext context = validateMessageRequest(roomId, request);
 
-            // 2. User 메시지 저장
-            userMessage = saveUserMessage(context.chatRoom(), context.aiModel(), request);
+            // 2. User 메시지 저장 (별도 트랜잭션 서비스 이용)
+            userMessage = messageTransactionService.saveUserMessage(context.chatRoom(), context.aiModel(), request);
             log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
 
             // SSE 시작 알림
@@ -134,9 +128,9 @@ public class MessageService {
             // 4. AI 서버로부터 SSE 스트리밍
             AiStreamingResult streamResult = streamAiResponse(requestBody, emitter);
 
-            // 5. 응답 처리 (코인 계산 및 저장)
-            processCompletedResponse(
-                    context.chatRoom(), context.aiModel(), context.user(), context.wallet(),
+            // 5. 응답 처리 (코인 계산 및 저장 - 별도 트랜잭션 서비스 이용)
+            messageTransactionService.processCompletedResponse(
+                    context.chatRoom(), context.aiModel(), context.user(),
                     userMessage, streamResult.aiResponseId(), streamResult.fullContent(),
                     streamResult.usage()
             );
@@ -190,7 +184,7 @@ public class MessageService {
         // AI 통신 실패 시 User 메시지 삭제 (보상 트랜잭션)
         if (userMessage != null) {
             try {
-                deleteUserMessage(userMessage);
+                messageTransactionService.deleteUserMessage(userMessage);
                 log.info("AI 통신 실패로 User 메시지 삭제 완료: messageId={}", userMessage.getMessageId());
             } catch (Exception deleteError) {
                 log.error("User 메시지 삭제 실패: messageId={}, error={}",
@@ -323,106 +317,6 @@ public class MessageService {
         }
 
         return new ValidatedMessageContext(user, chatRoom, aiModel, wallet);
-    }
-
-    /**
-     * User 메시지를 저장합니다 (별도 트랜잭션).
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected Message saveUserMessage(ChatRoom chatRoom, AIModel aiModel, SendMessageRequest request) {
-        Message userMessage = Message.builder()
-                .chatRoom(chatRoom)
-                .role(MessageRole.USER)
-                .content(request.message())
-                .fileUrl(request.fileId())
-                .aiModel(aiModel)
-                .build();
-
-        return messageRepository.save(userMessage);
-    }
-
-    /**
-     * User 메시지를 삭제합니다 (보상 트랜잭션).
-     * AI 통신 실패 시 orphaned User 메시지를 제거하기 위해 사용됩니다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void deleteUserMessage(Message userMessage) {
-        messageRepository.delete(userMessage);
-        log.debug("User 메시지 삭제: messageId={}", userMessage.getMessageId());
-    }
-
-    /**
-     * AI 응답 완료 후 코인 차감 및 메시지 저장을 처리합니다.
-     */
-    @Transactional
-    protected void processCompletedResponse(
-            ChatRoom chatRoom, AIModel aiModel, User user, UserWallet wallet,
-            Message userMessage, String aiResponseId, String fullContent, AiUsage usage) {
-
-        // 코인 계산
-        BigDecimal inputCoin = calculateCoin(usage.inputTokens(), aiModel.getInputPricePer1m());
-        BigDecimal outputCoin = calculateCoin(usage.outputTokens(), aiModel.getOutputPricePer1m());
-        BigDecimal totalCoin = inputCoin.add(outputCoin);
-
-        log.info("코인 계산: input={}, output={}, total={}", inputCoin, outputCoin, totalCoin);
-
-        // 코인 차감
-        wallet.deductBalance(totalCoin);
-
-        // Assistant 메시지 저장
-        Message assistantMessage = Message.builder()
-                .chatRoom(chatRoom)
-                .role(MessageRole.ASSISTANT)
-                .content(fullContent)
-                .aiModel(aiModel)
-                .tokenCount(BigDecimal.valueOf(usage.outputTokens()))
-                .coinCount(outputCoin)
-                .responseId(aiResponseId)
-                .build();
-        messageRepository.save(assistantMessage);
-
-        // User 메시지 업데이트
-        userMessage.updateResponseId(aiResponseId);
-        userMessage.updateTokenAndCoin(
-                BigDecimal.valueOf(usage.inputTokens()),
-                inputCoin
-        );
-
-        // ChatRoom 코인 사용량 업데이트
-        chatRoom.addCoinUsage(totalCoin);
-
-        // CoinTransaction 기록
-        CoinTransaction transaction = CoinTransaction.builder()
-                .user(user)
-                .chatRoom(chatRoom)
-                .message(assistantMessage)
-                .transactionType("AI_USAGE")
-                .amount(totalCoin.negate()) // 차감이므로 음수
-                .balanceAfter(wallet.getBalance())
-                .description(String.format("AI 모델 사용: %s (입력: %d토큰, 출력: %d토큰)",
-                        aiModel.getModelName(), usage.inputTokens(), usage.outputTokens()))
-                .aiModel(aiModel)
-                .build();
-        coinTransactionRepository.save(transaction);
-
-        log.info("코인 차감 및 메시지 저장 완료: totalCoin={}, balance={}", totalCoin, wallet.getBalance());
-    }
-
-    /**
-     * 토큰량으로부터 코인을 계산합니다.
-     * 공식: (토큰량 / 1,000,000) * 모델_가격_per_1M
-     */
-    private BigDecimal calculateCoin(Integer tokens, BigDecimal pricePer1M) {
-        if (tokens == null || tokens == 0) {
-            return BigDecimal.ZERO;
-        }
-
-        BigDecimal tokenAmount = BigDecimal.valueOf(tokens);
-        BigDecimal oneMillium = BigDecimal.valueOf(1_000_000);
-
-        return tokenAmount.divide(oneMillium, 10, RoundingMode.HALF_UP)
-                .multiply(pricePer1M)
-                .setScale(10, RoundingMode.HALF_UP);
     }
 
     /**
