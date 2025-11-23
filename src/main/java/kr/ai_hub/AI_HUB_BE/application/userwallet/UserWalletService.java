@@ -2,8 +2,8 @@ package kr.ai_hub.AI_HUB_BE.application.userwallet;
 
 import kr.ai_hub.AI_HUB_BE.application.userwallet.dto.BalanceResponse;
 import kr.ai_hub.AI_HUB_BE.application.userwallet.dto.UserWalletResponse;
-import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
-import kr.ai_hub.AI_HUB_BE.domain.userwallet.repository.UserWalletRepository;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserWallet;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserWalletRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.WalletNotFoundException;
 import lombok.RequiredArgsConstructor;

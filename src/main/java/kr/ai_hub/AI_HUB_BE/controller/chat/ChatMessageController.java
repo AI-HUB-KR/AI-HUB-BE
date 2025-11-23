@@ -1,11 +1,11 @@
 package kr.ai_hub.AI_HUB_BE.controller.chat;
 
 import jakarta.validation.Valid;
-import kr.ai_hub.AI_HUB_BE.application.message.MessageService;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.FileUploadResponse;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.MessageListItemResponse;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.MessageResponse;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.SendMessageRequest;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.MessageService;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.FileUploadResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageListItemResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

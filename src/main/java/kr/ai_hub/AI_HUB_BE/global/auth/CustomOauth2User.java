@@ -1,6 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.global.auth;
 
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 

@@ -1,10 +1,10 @@
 package kr.ai_hub.AI_HUB_BE.application.auth.accesstoken;
 
-import kr.ai_hub.AI_HUB_BE.domain.accesstoken.entity.AccessToken;
-import kr.ai_hub.AI_HUB_BE.domain.accesstoken.repository.AccessTokenRepository;
-import kr.ai_hub.AI_HUB_BE.domain.refreshtoken.entity.RefreshToken;
-import kr.ai_hub.AI_HUB_BE.domain.token.TokenRevokeReason;
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.domain.auth.AccessToken;
+import kr.ai_hub.AI_HUB_BE.domain.auth.AccessTokenRepository;
+import kr.ai_hub.AI_HUB_BE.domain.auth.RefreshToken;
+import kr.ai_hub.AI_HUB_BE.domain.auth.TokenRevokeReason;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.application.auth.TokenHashService;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;

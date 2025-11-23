@@ -1,6 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.application.dashboard.dto;
 
-import kr.ai_hub.AI_HUB_BE.domain.aimodel.entity.AIModel;
+import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import lombok.Builder;
 
 import java.math.BigDecimal;

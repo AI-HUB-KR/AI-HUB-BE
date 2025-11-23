@@ -174,47 +174,55 @@ curl http://localhost:8080/actuator/health
 ## 프로젝트 구조
 
 ```
-src/main/java/kr/ai_hub/AI_HUB_BE/
-├── AiHubBeApplication.java          # Spring Boot 애플리케이션 진입점
-├── controller/                      # REST API 엔드포인트 (HTTP 요청/응답)
-│   ├── admin/                       # 관리자 API
-│   │   └── aimodel/                 # AI 모델 관리 API
-│   ├── aimodel/                     # AI 모델 조회 API
-│   ├── auth/                        # 인증 API (로그인, 토큰 갱신)
-│   ├── chat/                        # 채팅 API (채팅방, 메시지)
-│   ├── cointransaction/             # 코인 거래 내역 API
-│   ├── dashboard/                   # 대시보드 통계 API
-│   ├── paymenthistory/              # 결제 내역 API
-│   ├── user/                        # 사용자 정보 API
-│   └── userwallet/                  # 지갑 조회 API
-├── application/                     # 비즈니스 로직 (Service + DTO)
-│   ├── admin/aimodel/               # 관리자 AI 모델 서비스
-│   ├── aimodel/                     # AI 모델 조회 서비스
-│   ├── auth/                        # 인증 서비스 (OAuth2, JWT)
-│   ├── chatroom/                    # 채팅방 서비스
-│   ├── cointransaction/             # 코인 거래 서비스
-│   ├── dashboard/                   # 대시보드 통계 서비스
-│   ├── message/                     # 메시지 서비스 (AI 통신, SSE 스트리밍)
-│   ├── paymenthistory/              # 결제 내역 서비스
-│   ├── user/                        # 사용자 서비스
-│   └── userwallet/                  # 지갑 서비스
-├── domain/                          # 도메인 엔티티 및 리포지토리
-│   ├── accesstoken/                 # Access Token 엔티티
-│   ├── refreshtoken/                # Refresh Token 엔티티
-│   ├── aimodel/                     # AI 모델 엔티티
-│   ├── chatroom/                    # 채팅방 엔티티
-│   ├── cointransaction/             # 코인 거래 엔티티
-│   ├── message/                     # 메시지 엔티티
-│   ├── paymenthistory/              # 결제 내역 엔티티
-│   ├── user/                        # 사용자 엔티티
-│   ├── userwallet/                  # 지갑 엔티티
-│   └── token/                       # 토큰 공통 (TokenRevokeReason 등)
-└── global/                          # 글로벌 설정 및 공통 컴포넌트
-    ├── application/                 # 공통 애플리케이션 서비스 (CookieService)
-    ├── auth/                        # 인증/인가 (JWT, OAuth2 Handler)
-    ├── common/response/             # 공통 응답 DTO (ApiResponse, ErrorResponse)
-    ├── config/                      # Spring 설정 (Security, OpenAPI, WebClient)
-    └── error/                       # 전역 예외 처리 및 커스텀 예외
+.
+├── spec/                            # 설계/운영 문서
+├── src/
+│   ├── main/
+│   │   ├── java/kr/ai_hub/AI_HUB_BE/
+│   │   │   ├── AiHubBeApplication.java
+│   │   │   ├── controller/          # REST API 엔드포인트
+│   │   │   │   ├── admin/           # 관리자 AI 모델 API
+│   │   │   │   ├── aimodel/         # 모델 조회 API
+│   │   │   │   ├── auth/            # 로그인/토큰 API
+│   │   │   │   ├── chat/            # 채팅 메시지/방 API
+│   │   │   │   ├── dashboard/       # 대시보드 통계 API
+│   │   │   │   ├── payment/         # 결제·코인 거래 API
+│   │   │   │   ├── user/            # 사용자 정보 API
+│   │   │   │   └── userwallet/      # 지갑 API
+│   │   │   ├── application/         # 비즈니스 로직 (Service + DTO)
+│   │   │   │   ├── admin/           # 관리자 모델 서비스
+│   │   │   │   ├── aimodel/         # 모델 조회 서비스
+│   │   │   │   ├── auth/            # OAuth2/JWT 서비스
+│   │   │   │   │   ├── accesstoken/
+│   │   │   │   │   └── refreshtoken/
+│   │   │   │   ├── chat/            # 채팅방·메시지 서비스
+│   │   │   │   │   ├── chatroom/
+│   │   │   │   │   └── message/
+│   │   │   │   ├── dashboard/       # 대시보드 통계 서비스
+│   │   │   │   ├── payment/         # 결제·코인 서비스
+│   │   │   │   ├── user/            # 사용자 서비스
+│   │   │   │   └── userwallet/      # 지갑 서비스
+│   │   │   ├── domain/              # 도메인 엔티티/리포지토리
+│   │   │   │   ├── aimodel/
+│   │   │   │   ├── auth/
+│   │   │   │   ├── chat/
+│   │   │   │   ├── payment/
+│   │   │   │   ├── user/
+│   │   │   │   └── userwallet/
+│   │   │   └── global/              # 전역 설정/공통 컴포넌트
+│   │   │       ├── application/     # 공통 서비스 (쿠키 등)
+│   │   │       ├── auth/            # JWT, OAuth2, 필터/핸들러
+│   │   │       ├── common/response/ # 공통 응답 DTO
+│   │   │       ├── config/          # Security, OpenAPI, WebClient
+│   │   │       └── error/           # 전역 예외 및 커스텀 예외
+│   ├── resources/
+│   │   ├── application.yaml
+│   │   ├── application-dev.yaml
+│   │   └── application-prod.yaml
+│   └── test/
+│       ├── java/kr/ai_hub/AI_HUB_BE/ # 통합/단위 테스트
+│       └── resources/                # 테스트용 프로퍼티
+└── gradle*, Dockerfile, build.gradle, settings.gradle, README.md 등 프로젝트 루트 자원
 ```
 
 ### 아키텍처 패턴

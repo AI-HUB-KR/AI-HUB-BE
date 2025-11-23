@@ -1,6 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.application.userwallet.dto;
 
-import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserWallet;
 import lombok.Builder;
 
 import java.math.BigDecimal;

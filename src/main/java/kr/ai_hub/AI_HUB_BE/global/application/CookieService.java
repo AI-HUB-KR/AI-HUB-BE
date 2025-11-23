@@ -3,7 +3,7 @@ package kr.ai_hub.AI_HUB_BE.global.application;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

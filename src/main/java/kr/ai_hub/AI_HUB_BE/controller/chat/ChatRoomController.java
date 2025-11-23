@@ -1,11 +1,11 @@
 package kr.ai_hub.AI_HUB_BE.controller.chat;
 
 import jakarta.validation.Valid;
-import kr.ai_hub.AI_HUB_BE.application.chatroom.ChatRoomService;
-import kr.ai_hub.AI_HUB_BE.application.chatroom.dto.ChatRoomListItemResponse;
-import kr.ai_hub.AI_HUB_BE.application.chatroom.dto.ChatRoomResponse;
-import kr.ai_hub.AI_HUB_BE.application.chatroom.dto.CreateChatRoomRequest;
-import kr.ai_hub.AI_HUB_BE.application.chatroom.dto.UpdateChatRoomRequest;
+import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.ChatRoomService;
+import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.dto.ChatRoomListItemResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.dto.ChatRoomResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.dto.CreateChatRoomRequest;
+import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.dto.UpdateChatRoomRequest;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

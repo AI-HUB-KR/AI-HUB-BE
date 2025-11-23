@@ -1,7 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.application.aimodel;
 
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
-import kr.ai_hub.AI_HUB_BE.domain.aimodel.repository.AIModelRepository;
+import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

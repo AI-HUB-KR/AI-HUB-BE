@@ -1,16 +1,16 @@
 package kr.ai_hub.AI_HUB_BE.application.dashboard;
 
 import kr.ai_hub.AI_HUB_BE.application.dashboard.dto.*;
-import kr.ai_hub.AI_HUB_BE.domain.aimodel.entity.AIModel;
-import kr.ai_hub.AI_HUB_BE.domain.aimodel.repository.AIModelRepository;
-import kr.ai_hub.AI_HUB_BE.domain.chatroom.repository.ChatRoomRepository;
-import kr.ai_hub.AI_HUB_BE.domain.cointransaction.entity.CoinTransaction;
-import kr.ai_hub.AI_HUB_BE.domain.cointransaction.repository.CoinTransactionRepository;
-import kr.ai_hub.AI_HUB_BE.domain.message.repository.MessageRepository;
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
-import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
-import kr.ai_hub.AI_HUB_BE.domain.userwallet.entity.UserWallet;
-import kr.ai_hub.AI_HUB_BE.domain.userwallet.repository.UserWalletRepository;
+import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
+import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
+import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoomRepository;
+import kr.ai_hub.AI_HUB_BE.domain.payment.CoinTransaction;
+import kr.ai_hub.AI_HUB_BE.domain.payment.CoinTransactionRepository;
+import kr.ai_hub.AI_HUB_BE.domain.chat.MessageRepository;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserWallet;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserWalletRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.UserNotFoundException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.WalletNotFoundException;

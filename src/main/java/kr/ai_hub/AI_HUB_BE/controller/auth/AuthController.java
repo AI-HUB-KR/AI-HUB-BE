@@ -4,7 +4,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.ai_hub.AI_HUB_BE.application.auth.refreshtoken.RefreshTokenService;
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.global.application.CookieService;
 import kr.ai_hub.AI_HUB_BE.global.auth.CustomOauth2User;
 import lombok.RequiredArgsConstructor;

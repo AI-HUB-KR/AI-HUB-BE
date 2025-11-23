@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.auth;
 
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.User;
-import kr.ai_hub.AI_HUB_BE.domain.user.entity.UserRole;
-import kr.ai_hub.AI_HUB_BE.domain.user.repository.UserRepository;
+import kr.ai_hub.AI_HUB_BE.domain.user.User;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserRole;
+import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.CustomOauth2User;
 import kr.ai_hub.AI_HUB_BE.global.auth.userinfo.OAuth2UserInfo;
 import kr.ai_hub.AI_HUB_BE.global.auth.userinfo.OAuth2UserInfoFactory;

@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.message;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.AiUsage;
-import kr.ai_hub.AI_HUB_BE.application.message.dto.SseEvent;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.AiUsage;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SseEvent;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
