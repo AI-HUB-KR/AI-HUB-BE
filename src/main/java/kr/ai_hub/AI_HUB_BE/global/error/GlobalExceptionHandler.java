@@ -1,13 +1,16 @@
 package kr.ai_hub.AI_HUB_BE.global.error;
 
+import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.AIServerException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.BaseException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.IllegalSystemStateException;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ErrorResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -17,9 +20,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.stream.Collectors;
 
 @Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private final SecurityContextHelper securityContextHelper;
     /**
      * ErrorCode를 HttpStatus로 매핑합니다.
      *
@@ -72,6 +77,19 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(status)
+                .body(response);
+    }
+
+    // @PreAuthorize 권한 체크 실패 시
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException e) {
+        Integer userId = securityContextHelper.getCurrentUserId();
+        log.warn("관리자 권한 없음: userId={}", userId);
+
+        ErrorResponse response = ErrorResponse.of(ErrorCode.FORBIDDEN);
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
                 .body(response);
     }
 

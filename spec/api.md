@@ -2720,3 +2720,95 @@ Authorization: Bearer <ACCESS_TOKEN>
     "timestamp": "2025-01-01T00:00:00Z"
   }
   ```
+
+---
+
+## 관리자 API
+
+### 지갑 잔액 직접 설정 (Admin Wallet Modify)
+
+- **Method**: `PATCH /api/v1/admin/wallet`
+- **설명**: 관리자가 사용자의 지갑 잔액을 직접 설정합니다. ADMIN 역할만 접근 가능합니다.
+- **인증**: 필수 (Bearer Token + ADMIN 역할)
+- **권한**: `@PreAuthorize("hasRole('ADMIN')")`
+
+**요청 헤더**
+```http
+Authorization: Bearer <ADMIN_ACCESS_TOKEN>
+```
+
+**쿼리 파라미터**
+
+| 파라미터 | 타입 | 설명 | 제약사항 |
+|---------|------|------|----------|
+| `userId` | Long | 사용자 ID | 필수, 양수 |
+| `amount` | Integer | 설정할 잔액 | 필수, 양수 |
+
+**요청 예시**
+```http
+PATCH /api/v1/admin/wallet?userId=1&amount=10000
+Authorization: Bearer <ADMIN_ACCESS_TOKEN>
+```
+
+**성공 응답**
+- **200 OK**: 지갑 잔액 설정 성공
+  ```json
+  {
+    "success": true,
+    "detail": null,
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+**오류 응답 예시**
+- **401 Unauthorized**: 인증 실패 또는 토큰 없음
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "INVALID_TOKEN",
+      "message": "인증이 필요합니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **403 Forbidden**: 권한 없음 (ADMIN이 아닌 경우)
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "FORBIDDEN",
+      "message": "권한이 없습니다.",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+- **404 Not Found**: 지갑을 찾을 수 없음
+  ```json
+  {
+    "success": false,
+    "detail": {
+      "code": "WALLET_NOT_FOUND",
+      "message": "지갑을 찾을 수 없습니다: {userId}",
+      "details": null
+    },
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+**구현 상세**
+
+1. **요청 처리**:
+   - userId: 사용자 ID 조회
+   - amount: 설정할 잔액 (현재 잔액과의 차이 계산)
+
+2. **비즈니스 로직**:
+   - 현재 잔액 조회
+   - 차이 계산 (newBalance - currentBalance)
+   - 차이가 양수면 `addBalance()`, 음수면 `deductBalance()` 호출
+
+3. **로깅**:
+   - WARN 레벨: 관리자의 지갑 직접 설정 시작
+   - INFO 레벨: 설정 완료 (userId, 이전 잔액, 현재 잔액)
