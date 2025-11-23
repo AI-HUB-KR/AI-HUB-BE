@@ -9,7 +9,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **주요 필드**:
   - `user_id` (INT, PK): 사용자 고유 ID
   - `username` (VARCHAR(50)): 사용자명
-  - `role` (VARCHAR(10)): 사용자 역할 (예: admin, user)
+  - `role` (VARCHAR(20)): 사용자 역할 (예: admin, user)
   - `email` (VARCHAR(255)): 이메일
   - `kakao_id` (VARCHAR(255)): 카카오 사용자 고유 ID (유니크)
   - `profile_image_url` (VARCHAR(500)): 프로필 이미지 URL

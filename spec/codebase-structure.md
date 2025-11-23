@@ -2,7 +2,7 @@
 
 > 이 문서는 코드베이스 탐색 시 빠르게 필요한 파일을 찾을 수 있도록 작성된 구조 가이드입니다.
 >
-> 마지막 업데이트: 2025-11-17
+> 마지막 업데이트: 2025-11-23
 
 ---
 
@@ -26,12 +26,12 @@
 **패키지 전략**: Package by Feature (도메인별 패키지 구조)
 
 ### 통계
-- **전체 Java 파일**: 110개
-- **Entity**: 11개 (MessageRole Enum 추가)
+- **전체 Java 파일**: 110개+
+- **Entity**: 11개
 - **Repository**: 9개
 - **Service**: 14개
 - **Controller**: 11개
-- **DTO**: 30개 (Message API 관련 7개 추가)
+- **DTO**: 30개+
 
 ---
 
@@ -75,7 +75,7 @@
 ```
 controller/
 ├── admin/
-│   └── aimodel/AdminAIModelController.java      # 관리자 AI 모델 관리 API
+│   └── AdminAIModelController.java      # 관리자 AI 모델 관리 API
 ├── aimodel/AIModelController.java               # AI 모델 조회 API
 ├── auth/
 │   ├── AuthController.java                      # OAuth2 로그인 API
@@ -83,11 +83,13 @@ controller/
 ├── chat/
 │   ├── ChatRoomController.java                  # 채팅방 CRUD API
 │   └── ChatMessageController.java               # 메시지 조회 API
-├── cointransaction/CoinTransactionController.java # 코인 거래 내역 API
 ├── dashboard/DashboardController.java           # 대시보드 통계 API
-├── paymenthistory/PaymentHistoryController.java # 결제 내역 API
-├── user/UserController.java                     # 사용자 정보 API
-└── userwallet/UserWalletController.java         # 지갑 조회 API
+├── payment/
+│   ├── CoinTransactionController.java           # 코인 거래 내역 API
+│   └── PaymentHistoryController.java            # 결제 내역 API
+└── user/
+    ├── UserController.java                      # 사용자 정보 API
+    └── UserWalletController.java                # 지갑 조회 API
 ```
 
 **역할**: HTTP 요청 처리, 입력 검증(@Valid), 응답 변환(ApiResponse)
@@ -115,16 +117,26 @@ application/
 │   └── dto/
 │       ├── RefreshedTokens.java
 │       └── TokenRefreshResponse.java
-├── chatroom/
-│   ├── ChatRoomService.java                     # 채팅방 CRUD 서비스
-│   └── dto/
-│       ├── ChatRoomListItemResponse.java
-│       ├── ChatRoomResponse.java
-│       ├── CreateChatRoomRequest.java
-│       └── UpdateChatRoomRequest.java
-├── cointransaction/
-│   ├── CoinTransactionService.java              # 코인 거래 내역 서비스
-│   └── dto/CoinTransactionResponse.java
+├── chat/
+│   ├── chatroom/
+│   │   ├── ChatRoomService.java                 # 채팅방 CRUD 서비스
+│   │   └── dto/
+│   │       ├── ChatRoomListItemResponse.java
+│   │       ├── ChatRoomResponse.java
+│   │       ├── CreateChatRoomRequest.java
+│   │       └── UpdateChatRoomRequest.java
+│   └── message/
+│       ├── MessageService.java                  # 메시지 조회/전송/파일업로드 서비스
+│       └── dto/
+│           ├── MessageListItemResponse.java
+│           ├── MessageResponse.java
+│           ├── FileUploadResponse.java              # 파일 업로드 응답
+│           ├── SendMessageRequest.java              # 메시지 전송 요청
+│           ├── AiServerResponse.java                # AI 서버 응답 래퍼
+│           ├── AiUploadData.java                    # AI 업로드 응답 데이터
+│           ├── AiChatData.java                      # AI 채팅 응답 데이터
+│           ├── AiUsage.java                         # 토큰 사용량 정보
+│           └── SseEvent.java                        # SSE 이벤트 파싱 DTO
 ├── dashboard/
 │   ├── DashboardService.java                    # 대시보드 통계 서비스
 │   └── dto/
@@ -134,31 +146,22 @@ application/
 │       ├── MonthlyUsageResponse.java
 │       ├── MostUsedModel.java
 │       └── UserStatsResponse.java
-├── message/
-│   ├── MessageService.java                      # 메시지 조회/전송/파일업로드 서비스
-│   └── dto/
-│       ├── MessageListItemResponse.java
-│       ├── MessageResponse.java
-│       ├── FileUploadResponse.java              # 파일 업로드 응답
-│       ├── SendMessageRequest.java              # 메시지 전송 요청
-│       ├── AiServerResponse.java                # AI 서버 응답 래퍼
-│       ├── AiUploadData.java                    # AI 업로드 응답 데이터
-│       ├── AiChatData.java                      # AI 채팅 응답 데이터
-│       ├── AiUsage.java                         # 토큰 사용량 정보
-│       └── SseEvent.java                        # SSE 이벤트 파싱 DTO
-├── paymenthistory/
+├── payment/
+│   ├── CoinTransactionService.java              # 코인 거래 내역 서비스
 │   ├── PaymentHistoryService.java               # 결제 내역 서비스
-│   └── dto/PaymentResponse.java
-├── user/
-│   ├── UserService.java                         # 사용자 정보 서비스
 │   └── dto/
-│       ├── UpdateUserRequest.java
-│       └── UserResponse.java
-└── userwallet/
-    ├── UserWalletService.java                   # 사용자 지갑 서비스
-    └── dto/
-        ├── BalanceResponse.java
-        └── UserWalletResponse.java
+│       ├── CoinTransactionResponse.java
+│       └── PaymentResponse.java
+└── user/
+    ├── UserService.java                         # 사용자 정보 서비스
+    ├── dto/
+    │   ├── UpdateUserRequest.java
+    │   └── UserResponse.java
+    └── userwallet/
+        ├── UserWalletService.java               # 사용자 지갑 서비스
+        └── dto/
+            ├── BalanceResponse.java
+            └── UserWalletResponse.java
 ```
 
 **역할**: 비즈니스 로직, 트랜잭션 관리(@Transactional), DTO 변환
@@ -170,38 +173,33 @@ application/
 
 ```
 domain/
-├── accesstoken/
-│   ├── entity/AccessToken.java
-│   └── repository/AccessTokenRepository.java
 ├── aimodel/
-│   ├── entity/AIModel.java                      # AI 모델 엔티티
+│   ├── AIModel.java                 # AI 모델 엔티티
 │   └── repository/AIModelRepository.java
-├── chatroom/
-│   ├── entity/ChatRoom.java                     # 채팅방 엔티티 (UUID v7)
-│   └── repository/ChatRoomRepository.java
-├── cointransaction/
-│   ├── entity/CoinTransaction.java              # 코인 거래 엔티티
-│   └── repository/CoinTransactionRepository.java
-├── message/
-│   ├── entity/
-│   │   ├── Message.java                         # 메시지 엔티티 (UUID v7)
-│   │   └── MessageRole.java                     # Enum: USER, ASSISTANT
-│   └── repository/MessageRepository.java
-├── paymenthistory/
-│   ├── entity/PaymentHistory.java               # 결제 내역 엔티티
-│   └── repository/PaymentHistoryRepository.java
-├── refreshtoken/
-│   ├── entity/RefreshToken.java
-│   └── repository/RefreshTokenRepository.java
+├── auth/
+│   ├── AccessToken.java
+│   ├── AccessTokenRepository.java
+│   ├── RefreshToken.java
+│   ├── RefreshTokenRepository.java
+│   └── TokenRevokeReason.java
+├── chat/
+│   ├── ChatRoom.java                            # 채팅방 엔티티 (UUID v7)
+│   ├── ChatRoomRepository.java
+│   ├── Message.java                             # 메시지 엔티티 (UUID v7)
+│   ├── MessageRepository.java
+│   └── MessageRole.java                     # Enum: USER, ASSISTANT
+├── payment/
+│   ├── CoinTransaction.java                     # 코인 거래 엔티티
+│   ├── CoinTransactionRepository.java
+│   ├── PaymentHistory.java               # 결제 내역 엔티티
+│   └── PaymentHistoryRepository.java
 ├── token/Token.java                             # 토큰 공통 인터페이스
-├── user/
-│   ├── entity/
-│   │   ├── User.java                            # 사용자 엔티티 (Soft Delete)
-│   │   └── UserRole.java                        # Enum: ROLE_USER, ROLE_ADMIN
-│   └── repository/UserRepository.java
-└── userwallet/
-    ├── entity/UserWallet.java                   # 사용자 지갑 엔티티
-    └── repository/UserWalletRepository.java
+└── user/
+    ├── User.java                                # 사용자 엔티티 (Soft Delete)
+    ├── UserRepository.java
+    ├── UserRole.java                        # Enum: ROLE_USER, ROLE_ADMIN
+    ├── UserWallet.java                   # 사용자 지갑 엔티티
+    └── UserWalletRepository.java
 ```
 
 **역할**: 도메인 모델, 데이터베이스 매핑, 비즈니스 규칙 캡슐화
@@ -236,16 +234,7 @@ global/
     └── exception/
         ├── BaseException.java                   # 기본 예외 클래스
         ├── AIServerException.java               # AI 서버 통신 예외
-        ├── ForbiddenException.java
-        ├── InsufficientBalanceException.java
-        ├── MessageNotFoundException.java
-        ├── ModelNotFoundException.java
-        ├── PaymentNotFoundException.java
-        ├── RoomNotFoundException.java
-        ├── TokenNotFoundException.java
-        ├── UserNotFoundException.java
-        ├── ValidationException.java
-        └── WalletNotFoundException.java
+        └── ... (도메인별 예외)
 ```
 
 **역할**: 전역 설정, 공통 컴포넌트, 횡단 관심사(인증, 예외처리)
@@ -258,8 +247,8 @@ global/
 ```
 Controller:  controller/user/UserController.java
 Service:     application/user/UserService.java
-Entity:      domain/user/entity/User.java
-Repository:  domain/user/repository/UserRepository.java
+Entity:      domain/user/User.java
+Repository:  domain/user/UserRepository.java
 DTOs:
   - application/user/dto/UpdateUserRequest.java
   - application/user/dto/UserResponse.java
@@ -268,6 +257,21 @@ API Endpoints:
   - GET    /api/v1/users/me           # 내 정보 조회
   - PUT    /api/v1/users/me           # 내 정보 수정
   - DELETE /api/v1/users/me           # 회원 탈퇴
+```
+
+### UserWallet (사용자 지갑)
+```
+Controller:  controller/user/UserWalletController.java
+Service:     application/user/userwallet/UserWalletService.java
+Entity:      domain/user/UserWallet.java
+Repository:  domain/user/UserWalletRepository.java
+DTOs:
+  - application/user/userwallet/dto/UserWalletResponse.java
+  - application/user/userwallet/dto/BalanceResponse.java
+
+API Endpoints:
+  - GET /api/v1/wallet          # 지갑 상세 정보
+  - GET /api/v1/wallet/balance  # 잔액 조회
 ```
 
 ### AIModel (AI 모델)
@@ -300,17 +304,31 @@ API Endpoints:
   - DELETE /api/v1/admin/models/{id}     # 모델 삭제 (관리자)
 ```
 
-### ChatRoom (채팅방)
+### Chat (채팅)
 ```
 Controller:  controller/chat/ChatRoomController.java
-Service:     application/chatroom/ChatRoomService.java
-Entity:      domain/chatroom/entity/ChatRoom.java
-Repository:  domain/chatroom/repository/ChatRoomRepository.java
+             controller/chat/ChatMessageController.java
+Service:     application/chat/chatroom/ChatRoomService.java
+             application/chat/message/MessageService.java
+Entity:      domain/chat/ChatRoom.java
+             domain/chat/Message.java
+             domain/chat/MessageRole.java (Enum)
+Repository:  domain/chat/ChatRoomRepository.java
+             domain/chat/MessageRepository.java
 DTOs:
-  - application/chatroom/dto/CreateChatRoomRequest.java
-  - application/chatroom/dto/UpdateChatRoomRequest.java
-  - application/chatroom/dto/ChatRoomResponse.java
-  - application/chatroom/dto/ChatRoomListItemResponse.java
+  - application/chat/chatroom/dto/CreateChatRoomRequest.java
+  - application/chat/chatroom/dto/UpdateChatRoomRequest.java
+  - application/chat/chatroom/dto/ChatRoomResponse.java
+  - application/chat/chatroom/dto/ChatRoomListItemResponse.java
+  - application/chat/message/dto/MessageResponse.java
+  - application/chat/message/dto/MessageListItemResponse.java
+  - application/chat/message/dto/FileUploadResponse.java
+  - application/chat/message/dto/SendMessageRequest.java
+  - application/chat/message/dto/AiServerResponse.java
+  - application/chat/message/dto/AiUploadData.java
+  - application/chat/message/dto/AiChatData.java
+  - application/chat/message/dto/AiUsage.java
+  - application/chat/message/dto/SseEvent.java
 
 API Endpoints:
   - POST   /api/v1/chat-rooms              # 채팅방 생성
@@ -318,72 +336,29 @@ API Endpoints:
   - GET    /api/v1/chat-rooms/{roomId}    # 채팅방 상세
   - PUT    /api/v1/chat-rooms/{roomId}    # 채팅방 수정
   - DELETE /api/v1/chat-rooms/{roomId}    # 채팅방 삭제
-```
-
-### Message (메시지)
-```
-Controller:  controller/chat/ChatMessageController.java
-Service:     application/message/MessageService.java
-Entity:      domain/message/entity/Message.java
-            domain/message/entity/MessageRole.java (Enum)
-Repository:  domain/message/repository/MessageRepository.java
-DTOs:
-  - application/message/dto/MessageResponse.java
-  - application/message/dto/MessageListItemResponse.java
-  - application/message/dto/FileUploadResponse.java
-  - application/message/dto/SendMessageRequest.java
-  - application/message/dto/AiServerResponse.java
-  - application/message/dto/AiUploadData.java
-  - application/message/dto/AiChatData.java
-  - application/message/dto/AiUsage.java
-  - application/message/dto/SseEvent.java
-
-API Endpoints:
   - GET  /api/v1/messages/page/{roomId}                # 메시지 목록 (페이지네이션)
   - GET  /api/v1/messages/{messageId}                  # 메시지 상세
   - POST /api/v1/messages/files/upload                 # 파일 업로드 (AI 서버)
   - POST /api/v1/messages/send/{roomId} (text/event-stream) # 메시지 전송 (SSE)
 ```
 
-### UserWallet (사용자 지갑)
+### Payment (결제 및 코인)
 ```
-Controller:  controller/userwallet/UserWalletController.java
-Service:     application/userwallet/UserWalletService.java
-Entity:      domain/userwallet/entity/UserWallet.java
-Repository:  domain/userwallet/repository/UserWalletRepository.java
+Controller:  controller/payment/PaymentHistoryController.java
+             controller/payment/CoinTransactionController.java
+Service:     application/payment/PaymentHistoryService.java
+             application/payment/CoinTransactionService.java
+Entity:      domain/payment/PaymentHistory.java
+             domain/payment/CoinTransaction.java
+Repository:  domain/payment/PaymentHistoryRepository.java
+             domain/payment/CoinTransactionRepository.java
 DTOs:
-  - application/userwallet/dto/UserWalletResponse.java
-  - application/userwallet/dto/BalanceResponse.java
-
-API Endpoints:
-  - GET /api/v1/wallet          # 지갑 상세 정보
-  - GET /api/v1/wallet/balance  # 잔액 조회
-```
-
-### PaymentHistory (결제 내역)
-```
-Controller:  controller/paymenthistory/PaymentHistoryController.java
-Service:     application/paymenthistory/PaymentHistoryService.java
-Entity:      domain/paymenthistory/entity/PaymentHistory.java
-Repository:  domain/paymenthistory/repository/PaymentHistoryRepository.java
-DTOs:
-  - application/paymenthistory/dto/PaymentResponse.java
+  - application/payment/dto/PaymentResponse.java
+  - application/payment/dto/CoinTransactionResponse.java
 
 API Endpoints:
   - GET /api/v1/payments              # 결제 목록 (status 필터)
   - GET /api/v1/payments/{paymentId} # 결제 상세
-```
-
-### CoinTransaction (코인 거래)
-```
-Controller:  controller/cointransaction/CoinTransactionController.java
-Service:     application/cointransaction/CoinTransactionService.java
-Entity:      domain/cointransaction/entity/CoinTransaction.java
-Repository:  domain/cointransaction/repository/CoinTransactionRepository.java
-DTOs:
-  - application/cointransaction/dto/CoinTransactionResponse.java
-
-API Endpoints:
   - GET /api/v1/transactions  # 거래 내역 (type, date 필터)
 ```
 
@@ -407,18 +382,16 @@ API Endpoints:
 
 ### Auth (인증)
 ```
-Controller:  controller/auth/
-  - AuthController.java
-  - TokenController.java
-Service:     application/auth/
-  - CustomOAuth2UserService.java
-  - TokenHashService.java
-  - accesstoken/AccessTokenService.java
-  - refreshtoken/RefreshTokenService.java
-Entity:      domain/accesstoken/entity/AccessToken.java
-             domain/refreshtoken/entity/RefreshToken.java
-Repository:  domain/accesstoken/repository/AccessTokenRepository.java
-             domain/refreshtoken/repository/RefreshTokenRepository.java
+Controller:  controller/auth/AuthController.java
+             controller/auth/TokenController.java
+Service:     application/auth/CustomOAuth2UserService.java
+             application/auth/TokenHashService.java
+             application/auth/accesstoken/AccessTokenService.java
+             application/auth/refreshtoken/RefreshTokenService.java
+Entity:      domain/auth/AccessToken.java
+             domain/auth/RefreshToken.java
+Repository:  domain/auth/AccessTokenRepository.java
+             domain/auth/RefreshTokenRepository.java
 
 API Endpoints:
   - POST /api/v1/auth/kakao      # Kakao OAuth2 로그인
@@ -437,7 +410,7 @@ JWT 예외 핸들러:        global/auth/jwt/JwtAuthenticationEntryPoint.java
 OAuth2 성공 핸들러:     global/auth/userinfo/OAuth2SuccessHandler.java
 OAuth2 사용자 서비스:   application/auth/CustomOAuth2UserService.java
 Security 설정:          global/config/SecurityConfig.java
-SecurityContext 헬퍼:   global/auth/SecurityContextHelper.java ✨
+SecurityContext 헬퍼:   global/auth/SecurityContextHelper.java
 ```
 
 ### 공통 컴포넌트
@@ -468,34 +441,8 @@ Main 클래스:           AiHubBeApplication.java
 ### application.yaml
 **위치**: `src/main/resources/application.yaml`
 
-```yaml
-주요 설정:
-  - spring.threads.virtual.enabled: Virtual Threads 활성화 (Java 21+)
-  - spring.datasource: 데이터베이스 연결 (H2/PostgreSQL)
-  - spring.jpa: JPA/Hibernate 설정
-    - default_batch_fetch_size: 100 (N+1 해결)
-  - spring.security.oauth2: Kakao OAuth2 설정
-  - jwt: JWT 토큰 설정 (secret, expiration)
-  - cors: CORS 허용 origin 설정
-  - ai-server.url: AI 서버 URL 설정 (외부 MSA 통신)
-  - logging: 로깅 레벨 설정
-```
-
 ### build.gradle
 **위치**: `build.gradle`
-
-```gradle
-주요 의존성:
-  - Spring Boot 3.5.6
-  - Spring Security
-  - Spring Data JPA
-  - Spring WebFlux (WebClient only, 리액티브 스택 미사용)
-  - PostgreSQL Driver
-  - H2 Database
-  - Lombok
-  - Validation
-  - Springdoc OpenAPI (Swagger)
-```
 
 ---
 
@@ -509,7 +456,7 @@ Main 클래스:           AiHubBeApplication.java
 | 메서드 | camelCase | `getCurrentUser()`, `createChatRoom()` |
 | 변수 | camelCase | `userId`, `chatRoom` |
 | 상수 | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE` |
-| 패키지 | lowercase | `application.user`, `domain.chatroom` |
+| 패키지 | lowercase | `application.user`, `domain.chat` |
 
 ### DTO 네이밍 패턴
 ```
@@ -652,52 +599,12 @@ Exception:    global/error/exception/{Name}Exception.java
 ## 📚 관련 문서
 
 - [API 명세서](./api.md)
-- [데이터베이스 스키마](./database-schema.md) *(작성 예정)*
+- [데이터베이스 스키마](./db.md)
+- [AI 서버 연동](./msa-ai-server.md)
 - [배포 가이드](./deployment.md) *(작성 예정)*
-
----
-
-## 📌 최근 주요 변경사항
-
-### 2025-11-17 (Virtual Threads 마이그레이션)
-- **Virtual Threads 적용**: Java 21+ Virtual Threads 활성화로 코드 간소화
-  - `application.yaml`에 `spring.threads.virtual.enabled: true` 추가
-  - `@EnableAsync` 제거 (Virtual Threads가 자동으로 동시성 처리)
-  - MessageService 리팩토링: 비동기 방식 → 동기 방식 (Virtual Threads가 I/O 블로킹 처리)
-  - WebClientConfig 간소화: Netty 저수준 설정 제거
-- **Message API 완전 구현**:
-  - `POST /api/v1/messages/files/upload`: 파일 업로드 API (AI 서버 연동)
-  - `POST /api/v1/messages/send/{roomId}`: 메시지 전송 및 SSE 스트리밍 API
-  - MessageRole Enum 추가 (USER, ASSISTANT)
-  - Message 엔티티 필드 추가: `response_id`, 도메인 메서드 추가
-  - 7개 DTO 추가: FileUploadResponse, SendMessageRequest, AiServerResponse, AiUploadData, AiChatData, AiUsage, SseEvent
-- **외부 MSA 통신 설정**:
-  - WebClientConfig: AI 서버 통신용 WebClient 설정 추가
-  - AIServerException: AI 서버 통신 예외 처리 추가
-  - `ai-server.url` 환경변수 설정 추가
-- **코인 계산 로직 통합**:
-  - ChatRoom.addCoinUsage() 메서드 추가
-  - Message 전송 시 자동 코인 차감 및 CoinTransaction 기록
-  - 코인 계산 공식: (tokens / 1,000,000) * price_per_1M
-
-### 2025-11-17 (초기)
-- **컨트롤러 구조 개선**: 채팅 관련 컨트롤러를 `chat/` 패키지로 통합
-  - `ChatRoomController`, `ChatMessageController`를 단일 패키지에서 관리
-- **Swagger/OpenAPI 추가**: API 문서 자동 생성 설정 (springdoc-openapi-starter-webmvc-ui:2.8.13)
-  - OpenAPI UI 접근: http://localhost:8080/swagger-ui.html
-  - OpenAPI 스펙: http://localhost:8080/v3/api-docs
-- **메시지 엔드포인트 변경**: `GET /api/v1/messages/page/{roomId}` 경로 변경
-- **Security 설정 개선**: Swagger 경로 및 OPTIONS preflight 요청 허용
-
-### 2025-11-11
-- **SecurityContextHelper 추가**: 8개 서비스에서 중복되던 `getCurrentUserId()` 로직 공통화
-- **Count 쿼리 최적화**: MessageRepository, ChatRoomRepository에 count 메서드 추가
-- **UserWallet 검증 강화**: 도메인 엔티티에 잔액 검증 로직 추가
-- **N+1 쿼리 해결**: Hibernate `default_batch_fetch_size: 100` 설정
-- **CORS 설정 개선**: 환경변수 기반 설정으로 변경
 
 ---
 
 **문서 버전**: 1.1.0
 **작성자**: Claude Code
-**마지막 업데이트**: 2025-11-17
+**마지막 업데이트**: 2025-11-23
