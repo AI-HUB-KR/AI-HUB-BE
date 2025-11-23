@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:test-db;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: none           # 스키마 DDL 실행 방지 (PostgreSQL-specific 구문 회피)
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+# 테스트용 기본 값 (프로덕션에서는 환경변수로 주입)
+jwt:
+  secret: test-jwt-secret
+  expiration:
+    access: 3600
+    refresh: 2592000
+
+ai-server:
+  url: http://localhost:18080
+
+deployment:
+  frontend:
+    redirect-url: http://localhost:3000
+  address: http://localhost:18080
+
+cors:
+  allowed-origins: http://localhost:3000
+
+# 테스트용 쿠키 설정 (CookieService @Value 주입용)
+cookie:
+  domain: ""
+  secure: false
+  same-site: Lax

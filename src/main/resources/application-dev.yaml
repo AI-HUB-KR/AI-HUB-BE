@@ -1,0 +1,67 @@
+# 개발 환경 프로파일 설정
+# 활성화: -Dspring.profiles.active=dev
+cookie:
+  domain: localhost
+  secure: false
+  same-site: Lax
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  # H2 웹 콘솔 활성화: http://localhost:8080/h2-console
+
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:create-drop}  # 개발용: 매번 스키마 재생성
+    show-sql: true  # SQL 로그 출력
+
+deployment:
+  address: ${DEPLOYMENT_ADDRESS:http://localhost:8080}
+  frontend:
+    redirect-url: ${FRONTEND_ADDRESS:http://localhost:3000}
+
+jwt:
+  secret: ${JWT_SECRET:dev_jwt_secret_key_for_development_only_do_not_use_in_production}
+  expiration:
+    access: ${JWT_EXPIRATION_SECOND:7200}
+    refresh: ${JWT_REFRESH_EXPIRATION_SECOND:604800}  # 7일
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8080}
+
+ai-server:
+  url: ${AI_SERVER_URL:http://localhost:3000}
+
+logging:
+  level:
+    root: INFO
+    kr.ai_hub.AI_HUB_BE: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  file:
+    name: logs/ai-hub-dev.log
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  # Swagger UI: http://localhost:8080/swagger-ui.html
