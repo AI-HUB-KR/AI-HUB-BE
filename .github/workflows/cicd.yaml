@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main       # 운영 환경 배포
-      - feat/cicd
   pull_request:
     branches:
       - main
