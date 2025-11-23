@@ -28,13 +28,12 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Mono;
+import org.springframework.core.ParameterizedTypeReference;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -53,9 +52,7 @@ public class MessageService {
     private final SecurityContextHelper securityContextHelper;
     private final WebClient aiServerWebClient;
     private final ObjectMapper objectMapper;
-
-    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    private final FileValidationService fileValidationService;
 
     /**
      * 특정 채팅방의 메시지 목록을 페이지네이션하여 조회합니다.
@@ -330,15 +327,15 @@ public class MessageService {
         log.info("파일 업로드 시작: fileName={}, size={}, modelId={}",
                 file.getOriginalFilename(), file.getSize(), modelId);
 
-        // 1. 파일 검증
-        validateFile(file);
+        // 파일 검증
+        fileValidationService.validateFile(file);
 
-        // 2. AI 모델 조회
+        // AI 모델 조회
         AIModel aiModel = aiModelRepository.findById(modelId)
                 .orElseThrow(() -> new ModelNotFoundException("AI 모델을 찾을 수 없습니다: " + modelId));
         log.debug("AI 모델 조회 성공: modelName={}", aiModel.getModelName());
 
-        // 3. AI 서버에 파일 업로드
+        // AI 서버에 파일 업로드
         try {
             // MultipartBodyBuilder를 사용하여 multipart/form-data 요청 생성
             MultipartBodyBuilder builder = new MultipartBodyBuilder();
@@ -355,7 +352,8 @@ public class MessageService {
                     .retrieve()
                     .onStatus(
                             status -> status.is4xxClientError() || status.is5xxServerError(),
-                            clientResponse -> clientResponse.bodyToMono(AiServerResponse.class)
+                            clientResponse -> clientResponse.bodyToMono(
+                                    new ParameterizedTypeReference<AiServerResponse<AiUploadData>>() {})
                                     .flatMap(errorResponse -> {
                                         String errorMessage = errorResponse.error() != null
                                                 ? errorResponse.error().message()
@@ -364,8 +362,7 @@ public class MessageService {
                                         return Mono.error(new AIServerException(errorMessage));
                                     })
                     )
-                    .bodyToMono(AiServerResponse.class)
-                    .cast(AiServerResponse.class)
+                    .bodyToMono(new ParameterizedTypeReference<AiServerResponse<AiUploadData>>() {})
                     .block(Duration.ofSeconds(30));  // 30초 타임아웃 명시
 
             if (response == null || !response.success() || response.data() == null) {
@@ -373,7 +370,7 @@ public class MessageService {
                 throw new AIServerException("AI 서버로부터 응답을 받지 못했습니다");
             }
 
-            AiUploadData uploadData = (AiUploadData) response.data();
+            AiUploadData uploadData = response.data();
             String fileId = uploadData.fileId();
             log.info("파일 업로드 성공: fileId={}", fileId);
 
@@ -388,44 +385,6 @@ public class MessageService {
         }
     }
 
-    /**
-     * 파일 유효성 검증
-     */
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new ValidationException("파일이 제공되지 않았습니다");
-        }
-
-        // 파일 크기 검증
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new ValidationException(
-                    String.format("파일 크기가 너무 큽니다. 최대 크기: %dMB", MAX_FILE_SIZE / 1024 / 1024));
-        }
-
-        // 파일 확장자 검증
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.isEmpty()) {
-            throw new ValidationException("파일명이 유효하지 않습니다");
-        }
-
-        String extension = getFileExtension(originalFilename);
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new ValidationException(
-                    String.format("지원하지 않는 파일 형식입니다: %s. 지원되는 형식: %s",
-                            extension, String.join(", ", ALLOWED_EXTENSIONS)));
-        }
-    }
-
-    /**
-     * 파일 확장자 추출
-     */
-    private String getFileExtension(String filename) {
-        int lastDotIndex = filename.lastIndexOf('.');
-        if (lastDotIndex == -1 || lastDotIndex == filename.length() - 1) {
-            return "";
-        }
-        return filename.substring(lastDotIndex + 1).toLowerCase();
-    }
 
     /**
      * 메시지 요청 검증 결과를 담는 DTO

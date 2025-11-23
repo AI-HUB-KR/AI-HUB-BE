@@ -65,9 +65,9 @@ public class ChatMessageController {
      * 이 ID는 이후 메시지 전송 시 사용할 수 있습니다.
      * </p>
      */
-    @PostMapping("/files/upload")
+    @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FileUploadResponse>> uploadFile(
-            @RequestParam("file") MultipartFile file,
+            @RequestPart("file") MultipartFile file,
             @RequestParam("modelId") Integer modelId) {
         log.info("파일 업로드 API 호출: fileName={}, size={}, modelId={}",
                 file.getOriginalFilename(), file.getSize(), modelId);
