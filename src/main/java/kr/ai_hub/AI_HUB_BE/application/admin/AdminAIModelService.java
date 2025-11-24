@@ -102,17 +102,4 @@ public class AdminAIModelService {
         log.info("모델 삭제 완료: modelId={}", modelId);
     }
 
-    /**
-     * 현재 사용자가 관리자 권한을 가지고 있는지 검증합니다.
-     */
-    private void validateAdminRole() {
-        Integer userId = securityContextHelper.getCurrentUserId();
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
-
-        if (user.getRole() != UserRole.ROLE_ADMIN) {
-            log.warn("관리자 권한 없음: userId={}, role={}", userId, user.getRole());
-            throw new ForbiddenException("관리자 권한이 필요합니다");
-        }
-    }
 }
