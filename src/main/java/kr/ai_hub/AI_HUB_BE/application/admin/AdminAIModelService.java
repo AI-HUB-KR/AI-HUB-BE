@@ -84,22 +84,20 @@ public class AdminAIModelService {
     }
 
     /**
-     * AI 모델을 삭제합니다 (관리자 전용).
+     * AI 모델을 삭제(soft-delete)합니다 (관리자 전용).
      */
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteModel(Integer modelId) {
         //validateAdminRole();
-        log.info("관리자 모델 삭제 요청: modelId={}", modelId);
+        log.info("관리자 모델 삭제(deactivate) 요청: modelId={}", modelId);
 
-        AIModel model = aiModelRepository.findById(modelId)
-                .orElseThrow(() -> new ModelNotFoundException("모델을 찾을 수 없습니다: " + modelId));
+        aiModelRepository
+                .findById(modelId)
+                .orElseThrow(() -> new ModelNotFoundException("모델을 찾을 수 없습니다: " + modelId))
+                .deactivate();
 
-        // 실제로는 참조 무결성 체크를 해야하지만, JPA가 자동으로 처리
-        // Foreign Key 제약 조건 위반 시 DataIntegrityViolationException 발생
-        aiModelRepository.delete(model);
-
-        log.info("모델 삭제 완료: modelId={}", modelId);
+        log.info("모델 삭제(deactivate) 완료: modelId={}", modelId);
     }
 
 }
