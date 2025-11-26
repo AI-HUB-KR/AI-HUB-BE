@@ -9,7 +9,7 @@ import java.math.BigDecimal;
  */
 public record CreateAIModelRequest(
         @NotBlank(message = "모델 이름은 필수입니다")
-        @Pattern(regexp = "^[a-z0-9-]+$", message = "모델 이름은 소문자, 숫자, 하이픈만 사용할 수 있습니다")
+        @Pattern(regexp = "^[a-z0-9.-]+$", message = "모델 이름은 소문자, 숫자, 하이픈, 점만 사용할 수 있습니다")
         String modelName,
 
         @NotBlank(message = "표시 이름은 필수입니다")
