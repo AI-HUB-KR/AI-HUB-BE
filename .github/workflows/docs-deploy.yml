@@ -3,11 +3,10 @@ name: Generate and Deploy API Docs
 on:
   push:
     branches: [ main, dev, feat/** ]
-    paths:
-      - 'src/**'
-      - 'build.gradle'
+
 permissions:
   contents: write
+
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
