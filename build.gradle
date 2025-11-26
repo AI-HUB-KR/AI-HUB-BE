@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.6'
 	id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.springdoc.openapi-gradle-plugin' version "1.8.0"
 }
 
 group = 'kr.ai-hub'
@@ -52,4 +53,13 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+openApi {
+    apiDocsUrl = "http://localhost:8080/v3/api-docs"
+    outputDir = file("$projectDir/docs")
+    outputFileName = "openapi.json"
+    waitTimeInSeconds = 10
+    customBootRun {
+        args.add("--spring.profiles.active=dev")
+    }
 }
