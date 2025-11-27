@@ -1384,6 +1384,12 @@
             "type": "integer",
             "format": "int32"
           },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
@@ -1393,12 +1399,6 @@
           },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
           },
           "empty": {
             "type": "boolean"
@@ -1485,6 +1485,12 @@
             "type": "integer",
             "format": "int32"
           },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
@@ -1494,12 +1500,6 @@
           },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
           },
           "empty": {
             "type": "boolean"
@@ -1701,6 +1701,12 @@
             "type": "integer",
             "format": "int32"
           },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
@@ -1710,12 +1716,6 @@
           },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
           },
           "empty": {
             "type": "boolean"
@@ -1980,6 +1980,12 @@
             "type": "integer",
             "format": "int32"
           },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
@@ -1989,12 +1995,6 @@
           },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
           },
           "empty": {
             "type": "boolean"
