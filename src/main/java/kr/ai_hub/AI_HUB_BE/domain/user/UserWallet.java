@@ -57,7 +57,7 @@ public class UserWallet {
      * 잔액을 증가시킵니다 (코인 구매 시 사용).
      *
      * @param amount 증가할 금액
-     * @throws IllegalArgumentException 금액이 null이거나 0 이하인 경우
+     * @throws IllegalArgumentException 금액(amount)이 null이거나 0 이하인 경우
      */
     public void addBalance(BigDecimal amount) {
         validatePositiveAmount(amount);
@@ -70,18 +70,10 @@ public class UserWallet {
     /**
      * 잔액을 차감합니다 (코인 사용 시 사용).
      *
-     * @param amount 차감할 금액
-     * @throws IllegalArgumentException 금액이 null이거나 0 이하인 경우
-     * @throws InsufficientBalanceException 잔액이 부족한 경우
+     * @param amount 차감할 금액 - 잔액은 0 이하일 수 있음
      */
     public void deductBalance(BigDecimal amount) {
         validatePositiveAmount(amount);
-
-        if (this.balance.compareTo(amount) < 0) {
-            throw new InsufficientBalanceException(
-                String.format("잔액 부족: 현재 잔액 %s, 차감 요청 금액 %s", this.balance, amount)
-            );
-        }
 
         this.balance = this.balance.subtract(amount);
         this.totalUsed = this.totalUsed.add(amount);
