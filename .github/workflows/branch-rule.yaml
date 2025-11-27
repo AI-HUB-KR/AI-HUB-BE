@@ -1,0 +1,57 @@
+name: 브랜치 규칙 체크
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronized, edited]
+
+jobs:
+  check-branch-rule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 브랜치 보호 규칙 준수 여부 확인
+        run: |
+          TARGET_BRANCH="${{ github.base_ref }}"
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          
+          echo "Target Branch: $TARGET_BRANCH"
+          echo "Source Branch: $SOURCE_BRANCH"
+
+          # ---------------------------------------------------
+          # 1. Main 브랜치 보호 규칙
+          # main은 release/* 와 hotfix/* 만 merge 허용
+          # ---------------------------------------------------
+          if [[ "$TARGET_BRANCH" == "main" ]]; then
+            if [[ ! "$SOURCE_BRANCH" =~ ^release/ ]] && [[ ! "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
+              echo "Error: 'main' 브랜치에는 'release/' 또는 'hotfix/' 브랜치만 병합할 수 있습니다."
+              exit 1
+            fi
+          fi
+
+          # ---------------------------------------------------
+          # 2. Release 브랜치 보호 규칙
+          # release/* 로의 merge는 hotfix/* 와 dev 만 허용
+          # ---------------------------------------------------
+          if [[ "$TARGET_BRANCH" =~ ^release/ ]]; then
+            if [[ "$SOURCE_BRANCH" != "dev" ]] && [[ ! "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
+              echo "Error: 'release' 브랜치에는 'dev' 또는 'hotfix/' 브랜치만 병합할 수 있습니다."
+              exit 1
+            fi
+          fi
+          
+          # ---------------------------------------------------
+          # 3. Dev 브랜치 보호 규칙
+          # dev 로는 feat/*, hotfix/*, release/*, main 허용
+          # ---------------------------------------------------
+          if [[ "$TARGET_BRANCH" == "dev" ]]; then
+            # 허용 목록: feat/..., hotfix/..., release/..., main
+            if [[ ! "$SOURCE_BRANCH" =~ ^feat/ ]] && \
+               [[ ! "$SOURCE_BRANCH" =~ ^hotfix/ ]] && \
+               [[ ! "$SOURCE_BRANCH" =~ ^release/ ]] && \
+               [[ "$SOURCE_BRANCH" != "main" ]]; then
+              echo "Error: 'dev' 브랜치에는 'feat/', 'hotfix/', 'release/' 브랜치 또는 'main'만 병합할 수 있습니다."
+              echo "현재 소스 브랜치: $SOURCE_BRANCH"
+              exit 1
+            fi
+          fi
+
+          echo "Branch rule check passed!"
