@@ -308,8 +308,8 @@ public class MessageService {
         UserWallet wallet = userWalletRepository.findByUser(user)
                 .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
 
-        if (wallet.getBalance().compareTo(BigDecimal.ZERO) < 0) {
-            log.warn("코인 잔액이 음수입니다: userId={}, balance={}", userId, wallet.getBalance());
+        if (wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("코인 잔액이 0 이하 입니다: userId={}, balance={}", userId, wallet.getBalance());
             throw new InsufficientBalanceException("코인 잔액이 부족합니다");
         }
 
