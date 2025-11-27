@@ -1,4 +1,4 @@
-name: Branch Merge Rule Check
+name: 브랜치 규칙 체크
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ jobs:
   check-branch-rule:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Branch Naming Rules
+      - name: 브랜치 보호 규칙 준수 여부 확인
         run: |
           TARGET_BRANCH="${{ github.base_ref }}"
           SOURCE_BRANCH="${{ github.head_ref }}"
