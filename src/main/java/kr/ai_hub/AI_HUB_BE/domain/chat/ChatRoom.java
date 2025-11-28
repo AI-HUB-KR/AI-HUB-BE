@@ -55,7 +55,7 @@ public class ChatRoom {
     /**
      * 코인 사용량을 증가시킵니다.
      *
-     * @param amount 증가시킬 코인 양
+     * @param amount 증가시킬 코인 양. 0 이하면 무시됩니다.
      */
     public void addCoinUsage(BigDecimal amount) {
         if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {

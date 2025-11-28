@@ -4,6 +4,7 @@ import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.AiUsage;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoom;
+import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoomRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.Message;
 import kr.ai_hub.AI_HUB_BE.domain.chat.MessageRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.MessageRole;
@@ -30,6 +31,7 @@ public class MessageTransactionService {
     private final MessageRepository messageRepository;
     private final UserWalletRepository userWalletRepository;
     private final CoinTransactionRepository coinTransactionRepository;
+    private final ChatRoomRepository chatRoomRepository;
 
     /**
      * User 메시지를 저장합니다 (별도 트랜잭션).
@@ -89,13 +91,16 @@ public class MessageTransactionService {
         );
         messageRepository.save(userMessage);
 
-        // ChatRoom 코인 사용량 업데이트
-        chatRoom.addCoinUsage(totalCoin);
-        
+        // ChatRoom 코인 사용량 업데이트 (영속 상태 보장 및 데이터 정합성 확보)
+        ChatRoom managedChatRoom = chatRoomRepository.findById(chatRoom.getRoomId())
+                .orElseThrow(() -> new IllegalStateException("채팅방을 찾을 수 없습니다"));
+
+        managedChatRoom.addCoinUsage(totalCoin);
+
         // CoinTransaction 기록
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .chatRoom(chatRoom)
+                .chatRoom(managedChatRoom)
                 .message(assistantMessage)
                 .transactionType("AI_USAGE")
                 .amount(totalCoin.negate()) // 차감이므로 음수
