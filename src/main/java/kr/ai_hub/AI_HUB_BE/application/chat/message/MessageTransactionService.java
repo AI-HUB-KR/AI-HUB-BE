@@ -100,7 +100,7 @@ public class MessageTransactionService {
         // CoinTransaction 기록
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .chatRoom(chatRoom)
+                .chatRoom(managedChatRoom)
                 .message(assistantMessage)
                 .transactionType("AI_USAGE")
                 .amount(totalCoin.negate()) // 차감이므로 음수
