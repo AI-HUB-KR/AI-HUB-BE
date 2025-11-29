@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.auth;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "토큰 관리", description = "Access Token 갱신")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/token")
@@ -26,6 +29,7 @@ public class TokenController {
     private final RefreshTokenService refreshTokenService;
     private final CookieService cookieService;
 
+    @Operation(summary = "토큰 갱신")
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<TokenRefreshResponse>> refreshToken(
             @AuthenticationPrincipal CustomOauth2User customOauth2User, HttpServletRequest request, HttpServletResponse response) {
