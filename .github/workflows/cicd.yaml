@@ -3,10 +3,14 @@ name: CI/CD 파이프라인
 on:
   push:
     branches:
-      - main       # 운영 환경 배포
+      - main
+      - dev
+      - 'release/**'
   pull_request:
     branches:
       - main
+      - dev
+      - 'release/**'
 
 env:
   REGISTRY: ghcr.io                        # GitHub Container Registry
