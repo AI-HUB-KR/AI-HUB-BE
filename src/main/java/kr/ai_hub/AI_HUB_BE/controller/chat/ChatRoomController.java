@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.chat;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.ChatRoomService;
 import kr.ai_hub.AI_HUB_BE.application.chat.chatroom.dto.ChatRoomListItemResponse;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "채팅방 관리", description = "채팅방 생성, 조회, 수정, 삭제")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/chat-rooms")
@@ -30,6 +33,7 @@ public class ChatRoomController {
     /**
      * 새로운 채팅방을 생성합니다.
      */
+    @Operation(summary = "채팅방 생성")
     @PostMapping
     public ResponseEntity<ApiResponse<ChatRoomResponse>> createChatRoom(@Valid @RequestBody CreateChatRoomRequest request) {
         log.info("채팅방 생성 API 호출: title={}", request.title());
@@ -44,6 +48,7 @@ public class ChatRoomController {
     /**
      * 현재 사용자의 채팅방 목록을 페이지네이션하여 조회합니다.
      */
+    @Operation(summary = "채팅방 목록 조회")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ChatRoomListItemResponse>>> getChatRooms(
             @RequestParam(defaultValue = "0") int page,
@@ -67,6 +72,7 @@ public class ChatRoomController {
     /**
      * 특정 채팅방의 상세 정보를 조회합니다.
      */
+    @Operation(summary = "채팅방 상세 조회")
     @GetMapping("/{roomId}")
     public ResponseEntity<ApiResponse<ChatRoomResponse>> getChatRoom(@PathVariable UUID roomId) {
         log.info("채팅방 상세 조회 API 호출: roomId={}", roomId);
@@ -79,6 +85,7 @@ public class ChatRoomController {
     /**
      * 채팅방 제목을 수정합니다.
      */
+    @Operation(summary = "채팅방 제목 수정")
     @PutMapping("/{roomId}")
     public ResponseEntity<ApiResponse<ChatRoomResponse>> updateChatRoom(
             @PathVariable UUID roomId,
@@ -93,6 +100,7 @@ public class ChatRoomController {
     /**
      * 채팅방을 삭제합니다.
      */
+    @Operation(summary = "채팅방 삭제")
     @DeleteMapping("/{roomId}")
     public ResponseEntity<Void> deleteChatRoom(@PathVariable UUID roomId) {
         log.info("채팅방 삭제 API 호출: roomId={}", roomId);

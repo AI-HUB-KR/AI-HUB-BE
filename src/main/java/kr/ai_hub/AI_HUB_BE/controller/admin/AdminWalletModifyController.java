@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.admin;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.ai_hub.AI_HUB_BE.application.admin.AdminWalletModifyService;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 
+@Tag(name = "지갑 관리 (관리자)", description = "사용자 지갑 잔액 수정")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/wallet")
@@ -21,6 +24,7 @@ public class AdminWalletModifyController {
 
     private final AdminWalletModifyService adminWalletModifyService;
 
+    @Operation(summary = "사용자 지갑 잔액 수정")
     @PatchMapping
     public ResponseEntity<ApiResponse<Void>> modifyUserWallet(
             @RequestParam Long userId,

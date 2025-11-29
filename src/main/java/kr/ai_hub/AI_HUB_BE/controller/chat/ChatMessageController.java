@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.chat;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.MessageService;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.FileUploadResponse;
@@ -24,6 +26,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
+@Tag(name = "메시지", description = "메시지 전송 및 AI 응답 수신")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/messages")
@@ -42,6 +45,7 @@ public class ChatMessageController {
      * - 코인 차감 및 Assistant 메시지 저장
      * </p>
      */
+    @Operation(summary = "메시지 전송 (SSE 스트리밍)")
     @PostMapping(value = "/send/{roomId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sendMessage(
             @PathVariable UUID roomId,
@@ -65,6 +69,7 @@ public class ChatMessageController {
      * 이 ID는 이후 메시지 전송 시 사용할 수 있습니다.
      * </p>
      */
+    @Operation(summary = "파일 업로드")
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FileUploadResponse>> uploadFile(
             @RequestPart("file") MultipartFile file,
@@ -82,6 +87,7 @@ public class ChatMessageController {
     /**
      * 특정 채팅방의 메시지 목록을 페이지네이션하여 조회합니다.
      */
+    @Operation(summary = "메시지 목록 조회")
     @GetMapping("/page/{roomId}")
     public ResponseEntity<ApiResponse<Page<MessageListItemResponse>>> getMessages(
             @PathVariable UUID roomId,
@@ -106,6 +112,7 @@ public class ChatMessageController {
     /**
      * 특정 메시지 1개의 상세 정보를 조회합니다.
      */
+    @Operation(summary = "메시지 상세 조회")
     @GetMapping("/{messageId}")
     public ResponseEntity<ApiResponse<MessageResponse>> getMessage(@PathVariable UUID messageId) {
         log.info("메시지 상세 조회 API 호출: messageId={}", messageId);
