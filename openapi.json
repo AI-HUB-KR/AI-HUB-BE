@@ -27,12 +27,63 @@
       "bearerAuth": []
     }
   ],
+  "tags": [
+    {
+      "name": "AI 모델 관리 (관리자)",
+      "description": "AI 모델 등록, 수정, 삭제"
+    },
+    {
+      "name": "토큰 관리",
+      "description": "Access Token 갱신"
+    },
+    {
+      "name": "지갑 관리 (관리자)",
+      "description": "사용자 지갑 잔액 수정"
+    },
+    {
+      "name": "메시지",
+      "description": "메시지 전송 및 AI 응답 수신"
+    },
+    {
+      "name": "AI 모델",
+      "description": "AI 모델 정보 조회"
+    },
+    {
+      "name": "인증",
+      "description": "카카오 소셜 로그인 및 토큰 관리"
+    },
+    {
+      "name": "채팅방 관리",
+      "description": "채팅방 생성, 조회, 수정, 삭제"
+    },
+    {
+      "name": "결제 내역",
+      "description": "코인 충전 및 결제 내역 관리"
+    },
+    {
+      "name": "대시보드",
+      "description": "통계 및 사용량 대시보드"
+    },
+    {
+      "name": "사용자 지갑",
+      "description": "사용자 지갑 및 잔액 관리"
+    },
+    {
+      "name": "코인 거래",
+      "description": "코인 거래 내역 조회"
+    },
+    {
+      "name": "사용자 관리",
+      "description": "사용자 정보 조회 및 수정"
+    }
+  ],
   "paths": {
     "/api/v1/users/me": {
       "get": {
         "tags": [
-          "user-controller"
+          "사용자 관리"
         ],
+        "summary": "내 정보 조회",
         "operationId": "getCurrentUser",
         "responses": {
           "200": {
@@ -49,8 +100,9 @@
       },
       "put": {
         "tags": [
-          "user-controller"
+          "사용자 관리"
         ],
+        "summary": "내 정보 수정",
         "operationId": "updateCurrentUser",
         "requestBody": {
           "content": {
@@ -77,8 +129,9 @@
       },
       "delete": {
         "tags": [
-          "user-controller"
+          "사용자 관리"
         ],
+        "summary": "회원 탈퇴",
         "operationId": "deleteCurrentUser",
         "responses": {
           "200": {
@@ -90,8 +143,9 @@
     "/api/v1/chat-rooms/{roomId}": {
       "get": {
         "tags": [
-          "chat-room-controller"
+          "채팅방 관리"
         ],
+        "summary": "채팅방 상세 조회",
         "operationId": "getChatRoom",
         "parameters": [
           {
@@ -119,8 +173,9 @@
       },
       "put": {
         "tags": [
-          "chat-room-controller"
+          "채팅방 관리"
         ],
+        "summary": "채팅방 제목 수정",
         "operationId": "updateChatRoom",
         "parameters": [
           {
@@ -158,8 +213,9 @@
       },
       "delete": {
         "tags": [
-          "chat-room-controller"
+          "채팅방 관리"
         ],
+        "summary": "채팅방 삭제",
         "operationId": "deleteChatRoom",
         "parameters": [
           {
@@ -182,8 +238,9 @@
     "/api/v1/admin/models/{modelId}": {
       "put": {
         "tags": [
-          "admin-ai-model-controller"
+          "AI 모델 관리 (관리자)"
         ],
+        "summary": "AI 모델 수정",
         "operationId": "updateModel",
         "parameters": [
           {
@@ -221,8 +278,9 @@
       },
       "delete": {
         "tags": [
-          "admin-ai-model-controller"
+          "AI 모델 관리 (관리자)"
         ],
+        "summary": "AI 모델 삭제",
         "operationId": "deleteModel",
         "parameters": [
           {
@@ -245,8 +303,9 @@
     "/api/v1/token/refresh": {
       "post": {
         "tags": [
-          "token-controller"
+          "토큰 관리"
         ],
+        "summary": "토큰 갱신",
         "operationId": "refreshToken",
         "responses": {
           "200": {
@@ -265,8 +324,9 @@
     "/api/v1/messages/send/{roomId}": {
       "post": {
         "tags": [
-          "chat-message-controller"
+          "메시지"
         ],
+        "summary": "메시지 전송 (SSE 스트리밍)",
         "operationId": "sendMessage",
         "parameters": [
           {
@@ -306,8 +366,9 @@
     "/api/v1/messages/files/upload": {
       "post": {
         "tags": [
-          "chat-message-controller"
+          "메시지"
         ],
+        "summary": "파일 업로드",
         "operationId": "uploadFile",
         "parameters": [
           {
@@ -355,8 +416,9 @@
     "/api/v1/chat-rooms": {
       "get": {
         "tags": [
-          "chat-room-controller"
+          "채팅방 관리"
         ],
+        "summary": "채팅방 목록 조회",
         "operationId": "getChatRooms",
         "parameters": [
           {
@@ -404,8 +466,9 @@
       },
       "post": {
         "tags": [
-          "chat-room-controller"
+          "채팅방 관리"
         ],
+        "summary": "채팅방 생성",
         "operationId": "createChatRoom",
         "requestBody": {
           "content": {
@@ -434,8 +497,9 @@
     "/api/v1/auth/logout": {
       "post": {
         "tags": [
-          "auth-controller"
+          "인증"
         ],
+        "summary": "로그아웃",
         "operationId": "logout",
         "responses": {
           "200": {
@@ -447,8 +511,9 @@
     "/api/v1/admin/models": {
       "post": {
         "tags": [
-          "admin-ai-model-controller"
+          "AI 모델 관리 (관리자)"
         ],
+        "summary": "AI 모델 등록",
         "operationId": "createModel",
         "requestBody": {
           "content": {
@@ -477,8 +542,9 @@
     "/api/v1/admin/wallet": {
       "patch": {
         "tags": [
-          "admin-wallet-modify-controller"
+          "지갑 관리 (관리자)"
         ],
+        "summary": "사용자 지갑 잔액 수정",
         "operationId": "modifyUserWallet",
         "parameters": [
           {
@@ -517,8 +583,9 @@
     "/api/v1/wallet": {
       "get": {
         "tags": [
-          "user-wallet-controller"
+          "사용자 지갑"
         ],
+        "summary": "지갑 상세 조회",
         "operationId": "getUserWallet",
         "responses": {
           "200": {
@@ -537,8 +604,9 @@
     "/api/v1/wallet/balance": {
       "get": {
         "tags": [
-          "user-wallet-controller"
+          "사용자 지갑"
         ],
+        "summary": "코인 잔액 조회",
         "operationId": "getBalance",
         "responses": {
           "200": {
@@ -557,8 +625,9 @@
     "/api/v1/transactions": {
       "get": {
         "tags": [
-          "coin-transaction-controller"
+          "코인 거래"
         ],
+        "summary": "코인 거래 내역 조회",
         "operationId": "getTransactions",
         "parameters": [
           {
@@ -625,8 +694,9 @@
     "/api/v1/payments": {
       "get": {
         "tags": [
-          "payment-history-controller"
+          "결제 내역"
         ],
+        "summary": "결제 내역 목록 조회",
         "operationId": "getPayments",
         "parameters": [
           {
@@ -675,8 +745,9 @@
     "/api/v1/payments/{paymentId}": {
       "get": {
         "tags": [
-          "payment-history-controller"
+          "결제 내역"
         ],
+        "summary": "결제 상세 조회",
         "operationId": "getPayment",
         "parameters": [
           {
@@ -706,8 +777,9 @@
     "/api/v1/models": {
       "get": {
         "tags": [
-          "ai-model-controller"
+          "AI 모델"
         ],
+        "summary": "활성화된 AI 모델 목록 조회",
         "operationId": "getActiveModels",
         "responses": {
           "200": {
@@ -726,8 +798,9 @@
     "/api/v1/messages/{messageId}": {
       "get": {
         "tags": [
-          "chat-message-controller"
+          "메시지"
         ],
+        "summary": "메시지 상세 조회",
         "operationId": "getMessage",
         "parameters": [
           {
@@ -757,8 +830,9 @@
     "/api/v1/messages/page/{roomId}": {
       "get": {
         "tags": [
-          "chat-message-controller"
+          "메시지"
         ],
+        "summary": "메시지 목록 조회",
         "operationId": "getMessages",
         "parameters": [
           {
@@ -817,8 +891,9 @@
     "/api/v1/dashboard/usage/monthly": {
       "get": {
         "tags": [
-          "dashboard-controller"
+          "대시보드"
         ],
+        "summary": "월별 사용량 조회",
         "operationId": "getMonthlyUsage",
         "parameters": [
           {
@@ -859,8 +934,9 @@
     "/api/v1/dashboard/stats": {
       "get": {
         "tags": [
-          "dashboard-controller"
+          "대시보드"
         ],
+        "summary": "사용자 통계 조회",
         "operationId": "getUserStats",
         "responses": {
           "200": {
@@ -879,8 +955,9 @@
     "/api/v1/dashboard/models/pricing": {
       "get": {
         "tags": [
-          "dashboard-controller"
+          "대시보드"
         ],
+        "summary": "모델 가격 조회",
         "operationId": "getModelPricing",
         "responses": {
           "200": {
