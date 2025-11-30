@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.admin;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.admin.AdminAIModelService;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "AI 모델 관리 (관리자)", description = "AI 모델 등록, 수정, 삭제")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/models")
@@ -23,6 +26,7 @@ public class AdminAIModelController {
     /**
      * 새로운 AI 모델을 등록합니다 (관리자 전용).
      */
+    @Operation(summary = "AI 모델 등록")
     @PostMapping
     public ResponseEntity<ApiResponse<AIModelResponse>> createModel(@Valid @RequestBody CreateAIModelRequest request) {
         log.info("관리자 모델 생성 API 호출: modelName={}", request.modelName());
@@ -37,6 +41,7 @@ public class AdminAIModelController {
     /**
      * AI 모델 정보를 수정합니다 (관리자 전용).
      */
+    @Operation(summary = "AI 모델 수정")
     @PutMapping("/{modelId}")
     public ResponseEntity<ApiResponse<AIModelResponse>> updateModel(
             @PathVariable Integer modelId,
@@ -51,6 +56,7 @@ public class AdminAIModelController {
     /**
      * AI 모델을 삭제합니다 (관리자 전용).
      */
+    @Operation(summary = "AI 모델 삭제")
     @DeleteMapping("/{modelId}")
     public ResponseEntity<Void> deleteModel(@PathVariable Integer modelId) {
         log.info("관리자 모델 삭제 API 호출: modelId={}", modelId);

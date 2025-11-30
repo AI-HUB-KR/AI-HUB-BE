@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.dashboard;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import kr.ai_hub.AI_HUB_BE.application.dashboard.DashboardService;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "대시보드", description = "통계 및 사용량 대시보드")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/dashboard")
@@ -31,6 +34,7 @@ public class DashboardController {
     /**
      * 모든 활성화된 AI 모델의 가격 정보를 조회합니다 (Public API).
      */
+    @Operation(summary = "모델 가격 조회")
     @GetMapping("/models/pricing")
     public ResponseEntity<ApiResponse<List<ModelPricingResponse>>> getModelPricing() {
         log.info("모델 가격 대시보드 API 호출");
@@ -43,6 +47,7 @@ public class DashboardController {
     /**
      * 현재 사용자의 월별 모델별 코인 사용량 통계를 조회합니다.
      */
+    @Operation(summary = "월별 사용량 조회")
     @GetMapping("/usage/monthly")
     public ResponseEntity<ApiResponse<MonthlyUsageResponse>> getMonthlyUsage(
             @RequestParam(required = false) Integer year,
@@ -62,6 +67,7 @@ public class DashboardController {
     /**
      * 현재 사용자의 코인 및 활동 통계를 요약합니다.
      */
+    @Operation(summary = "사용자 통계 조회")
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<UserStatsResponse>> getUserStats() {
         log.info("사용자 통계 요약 API 호출");

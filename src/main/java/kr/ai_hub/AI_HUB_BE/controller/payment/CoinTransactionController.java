@@ -1,5 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.payment;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.ai_hub.AI_HUB_BE.application.payment.CoinTransactionService;
 import kr.ai_hub.AI_HUB_BE.application.payment.dto.CoinTransactionResponse;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
+@Tag(name = "코인 거래", description = "코인 거래 내역 조회")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/transactions")
@@ -26,6 +29,7 @@ public class CoinTransactionController {
     /**
      * 현재 사용자의 코인 거래 내역을 필터링하여 조회합니다.
      */
+    @Operation(summary = "코인 거래 내역 조회")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<CoinTransactionResponse>>> getTransactions(
             @RequestParam(required = false) String transactionType,
