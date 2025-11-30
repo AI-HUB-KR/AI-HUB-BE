@@ -38,12 +38,12 @@ public class FileValidationService {
      * 문서는 추후 지원 예정
      */
     private static final Map<String, String> ALLOWED_MIME_TYPES = Map.ofEntries(
-        Map.entry("jpg", "image/jpeg"),
-        Map.entry("jpeg", "image/jpeg"),
-        Map.entry("png", "image/png"),
-        Map.entry("webp", "image/webp")
-//        Map.entry("gif", "image/gif"),
-//        Map.entry("pdf", "application/pdf")
+            Map.entry("jpg", "image/jpeg"),
+            Map.entry("jpeg", "image/jpeg"),
+            Map.entry("png", "image/png"),
+            Map.entry("webp", "image/webp")
+    // Map.entry("gif", "image/gif"),
+    // Map.entry("pdf", "application/pdf")
     );
 
     /**
@@ -59,14 +59,14 @@ public class FileValidationService {
      * @throws ValidationException 검증 실패 시 예외 발생
      */
     public void validateFile(MultipartFile file) {
-        log.debug("파일 검증 시작: fileName={}, size={}",
-            file.getOriginalFilename(), file.getSize());
-
         // 1. 파일 존재 여부 확인
         if (file == null || file.isEmpty()) {
             log.warn("파일이 제공되지 않았습니다");
             throw new ValidationException("파일이 제공되지 않았습니다");
         }
+
+        log.debug("파일 검증 시작: fileName={}, size={}",
+                file.getOriginalFilename(), file.getSize());
 
         // 2. 파일 크기 검증
         validateFileSize(file);
@@ -104,8 +104,7 @@ public class FileValidationService {
         if (file.getSize() > MAX_FILE_SIZE) {
             log.warn("파일 크기 초과: size={}, maxSize={}", file.getSize(), MAX_FILE_SIZE);
             throw new ValidationException(
-                String.format("파일 크기가 너무 큽니다. 최대 크기: %dMB", MAX_FILE_SIZE / 1024 / 1024)
-            );
+                    String.format("파일 크기가 너무 큽니다. 최대 크기: %dMB", MAX_FILE_SIZE / 1024 / 1024));
         }
     }
 
@@ -127,7 +126,7 @@ public class FileValidationService {
         String safeName = new File(originalFilename).getName();
         if (!safeName.equals(originalFilename)) {
             log.warn("위험한 파일명 감지: originalName={}, safeName={}",
-                originalFilename, safeName);
+                    originalFilename, safeName);
             throw new ValidationException("유효하지 않은 파일명입니다");
         }
 
@@ -146,11 +145,10 @@ public class FileValidationService {
 
         if (extension.isEmpty() || !ALLOWED_MIME_TYPES.containsKey(extension)) {
             log.warn("지원하지 않는 파일 확장자: extension={}, allowed={}",
-                extension, ALLOWED_MIME_TYPES.keySet());
+                    extension, ALLOWED_MIME_TYPES.keySet());
             throw new ValidationException(
-                String.format("지원하지 않는 파일 형식입니다: %s. 지원되는 형식: %s",
-                    extension, String.join(", ", ALLOWED_MIME_TYPES.keySet()))
-            );
+                    String.format("지원하지 않는 파일 형식입니다: %s. 지원되는 형식: %s",
+                            extension, String.join(", ", ALLOWED_MIME_TYPES.keySet())));
         }
 
         return extension;
@@ -161,7 +159,7 @@ public class FileValidationService {
      * 파일의 Content-Type이 확장자와 일치하는지 확인합니다.
      *
      * @param contentType 파일의 Content-Type
-     * @param extension 파일 확장자
+     * @param extension   파일 확장자
      * @throws ValidationException Content-Type이 일치하지 않는 경우 예외 발생
      */
     private void validateContentType(String contentType, String extension) {
@@ -173,11 +171,10 @@ public class FileValidationService {
         String expectedMimeType = ALLOWED_MIME_TYPES.get(extension);
         if (!contentType.equals(expectedMimeType)) {
             log.warn("Content-Type 불일치: contentType={}, expected={}, extension={}",
-                contentType, expectedMimeType, extension);
+                    contentType, expectedMimeType, extension);
             throw new ValidationException(
-                String.format("파일 형식이 일치하지 않습니다. 확장자: %s, Content-Type: %s",
-                    extension, contentType)
-            );
+                    String.format("파일 형식이 일치하지 않습니다. 확장자: %s, Content-Type: %s",
+                            extension, contentType));
         }
     }
 
@@ -186,10 +183,10 @@ public class FileValidationService {
      * 실제 파일 헤더의 바이너리 패턴을 분석하여 파일 형식을 검증합니다.
      * 이를 통해 확장자를 위조한 파일을 감지할 수 있습니다.
      *
-     * @param file 검증할 파일
+     * @param file      검증할 파일
      * @param extension 파일 확장자
-     * @throws IOException 파일 읽기 실패 시 예외 발생
-     * @throws TikaException Tika 설정 오류 시 예외 발생
+     * @throws IOException         파일 읽기 실패 시 예외 발생
+     * @throws TikaException       Tika 설정 오류 시 예외 발생
      * @throws ValidationException 파일 형식이 일치하지 않는 경우 예외 발생
      */
     private void validateMagicNumber(MultipartFile file, String extension) throws IOException, TikaException {
@@ -201,14 +198,13 @@ public class FileValidationService {
 
         // 파일을 byte[] 형태로 변환하여 Tika에 전달
         byte[] fileBytes = file.getBytes();
-        try (TikaInputStream tikaInputStream =
-                TikaInputStream.get(fileBytes, metadata)) {
+        try (TikaInputStream tikaInputStream = TikaInputStream.get(fileBytes, metadata)) {
 
             Detector detector = tikaConfig.getDetector();
             MediaType detectedType = detector.detect(tikaInputStream, metadata);
 
             log.debug("Tika 감지 결과: detectedType={}, extension={}, contentType={}",
-                detectedType, extension, file.getContentType());
+                    detectedType, extension, file.getContentType());
 
             // 감지된 MIME Type이 허용된 목록에 있는지 확인
             String expectedMimeType = ALLOWED_MIME_TYPES.get(extension);
@@ -216,10 +212,9 @@ public class FileValidationService {
 
             if (!expectedMimeType.equals(detectedMimeType)) {
                 log.warn("파일 형식 불일치 (Magic Number): expected={}, detected={}, extension={}",
-                    expectedMimeType, detectedMimeType, extension);
+                        expectedMimeType, detectedMimeType, extension);
                 throw new ValidationException(
-                    String.format("파일 형식이 일치하지 않습니다. 감지된 타입: %s", detectedMimeType)
-                );
+                        String.format("파일 형식이 일치하지 않습니다. 감지된 타입: %s", detectedMimeType));
             }
         }
     }
