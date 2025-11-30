@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -29,35 +29,35 @@ class AuthControllerTest {
         @Autowired
         private MockMvc mockMvc;
 
-        @MockBean
+        @MockitoBean
         private RefreshTokenService refreshTokenService;
 
-        @MockBean
+        @MockitoBean
         private CookieService cookieService;
 
-        @MockBean
+        @MockitoBean
         private kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtTokenProvider jwtTokenProvider;
 
-        @MockBean
+        @MockitoBean
         private kr.ai_hub.AI_HUB_BE.application.auth.CustomOAuth2UserService customOAuth2UserService;
 
-        @MockBean
+        @MockitoBean
         private org.springframework.security.web.authentication.AuthenticationSuccessHandler authenticationSuccessHandler;
 
         // JwtAuthenticationFilter is NOT mocked, so the real one is used.
         // Its dependencies (JwtTokenProvider, AccessTokenService, CookieService) are
         // mocked.
 
-        @MockBean
+        @MockitoBean
         private kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-        @MockBean
+        @MockitoBean
         private kr.ai_hub.AI_HUB_BE.application.auth.accesstoken.AccessTokenService accessTokenService;
 
-        @MockBean
+        @MockitoBean
         private kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper securityContextHelper;
 
-        @MockBean
+        @MockitoBean
         private org.springframework.data.jpa.mapping.JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
         @Test
