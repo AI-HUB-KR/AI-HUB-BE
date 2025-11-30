@@ -11,10 +11,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "\"user\"", indexes = {
-    @Index(name = "idx_user_email", columnList = "email"),
-    @Index(name = "idx_user_kakao_id", columnList = "kakao_id"),
-    @Index(name = "idx_user_username", columnList = "username"),
-    @Index(name = "idx_user_is_deleted", columnList = "is_deleted")
+        @Index(name = "idx_user_email", columnList = "email"),
+        @Index(name = "idx_user_kakao_id", columnList = "kakao_id"),
+        @Index(name = "idx_user_username", columnList = "username"),
+        @Index(name = "idx_user_is_deleted", columnList = "is_deleted")
 })
 @EntityListeners(AuditingEntityListener.class)
 @SQLRestriction("is_deleted = false")
@@ -73,15 +73,15 @@ public class User {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private UserWallet wallet;
 
-    @PostPersist  // DB INSERT 직후 실행
-      private void createWallet() {
-          if (this.wallet == null) {
-              this.wallet = UserWallet.builder()
-                  .user(this)
-                  .balance(BigDecimal.ZERO)
-                  .totalPurchased(BigDecimal.ZERO)
-                  .totalUsed(BigDecimal.ZERO)
-                  .build();
-          }
-      }
+    @PostPersist // DB INSERT 직후 실행
+    private void createWallet() {
+        if (this.wallet == null) {
+            this.wallet = UserWallet.builder()
+                    .user(this)
+                    .balance(BigDecimal.ZERO)
+                    .totalPurchased(BigDecimal.ZERO)
+                    .totalUsed(BigDecimal.ZERO)
+                    .build();
+        }
+    }
 }
