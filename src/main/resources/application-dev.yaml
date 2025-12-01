@@ -3,7 +3,7 @@
 cookie:
   domain:  ${COOKIE_DOMAIN:localhost}
   secure: false
-  same-site: Lax
+  same-site: ${COOKIE_SAME_SITE:None}
 
 spring:
   datasource:
