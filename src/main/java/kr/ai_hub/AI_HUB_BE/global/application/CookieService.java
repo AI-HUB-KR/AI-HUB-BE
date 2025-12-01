@@ -18,7 +18,7 @@ import java.time.Duration;
 @Slf4j
 @Service
 public class CookieService {
-
+    // Cookie 발급 주체 (Spring 서버 도메인)
     @Value("${cookie.domain:}")
     private String cookieDomain;
 

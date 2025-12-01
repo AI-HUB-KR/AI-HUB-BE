@@ -1,7 +1,7 @@
 # 개발 환경 프로파일 설정
 # 활성화: -Dspring.profiles.active=dev
 cookie:
-  domain: localhost
+  domain:  ${COOKIE_DOMAIN:localhost}
   secure: false
   same-site: Lax
 
