@@ -1489,11 +1489,11 @@
             "type": "integer",
             "format": "int64"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "paged": {
             "type": "boolean"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "pageNumber": {
             "type": "integer",
