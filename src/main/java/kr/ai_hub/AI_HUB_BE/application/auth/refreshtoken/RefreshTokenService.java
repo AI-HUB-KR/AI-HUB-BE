@@ -148,7 +148,7 @@ public class RefreshTokenService {
         return refreshTokenRepository.findByTokenHash(tokenHash);
     }
 
-    // Refresh Token 폐기
+    // Refresh Token 폐기 및 연관된 Access Token 폐기
     public void revokeToken(RefreshToken refreshToken, TokenRevokeReason reason) {
         refreshToken.revoke(reason);
         refreshTokenRepository.save(refreshToken);
