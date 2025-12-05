@@ -28,6 +28,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final CookieService cookieService;
 
+    // AccessToken을 활용하여 유저 정보를 가져온 다음, 로그이웃(토큰 폐기 및 쿠키 삭제)을 진행
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
