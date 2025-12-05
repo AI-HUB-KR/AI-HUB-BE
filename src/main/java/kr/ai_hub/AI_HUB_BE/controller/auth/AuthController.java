@@ -42,7 +42,7 @@ public class AuthController {
         Cookie refreshTokenCookie = cookieService.findRefreshTokenCookie(request);
         log.debug("사용자 {} 로그아웃 처리 중", user.getUserId());
 
-        // DB에서 사용자의 모든 토큰 폐기 및 삭제
+        // DB에서 사용자의 모든 토큰(Refresh/Access) 폐기 및 삭제
         refreshTokenService.deleteAllByUser(user);
 
         // 쿠키 삭제
