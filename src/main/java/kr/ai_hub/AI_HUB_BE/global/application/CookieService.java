@@ -82,7 +82,7 @@ public class CookieService {
         return refreshTokenCookie;
     }
 
-    // 로그아웃 시 토큰 쿠키 삭제
+    // 로그아웃 시 브라우저의 Access/Refresh 토큰 쿠키 삭제(빈 값과 만료 시간 0으로 설정)
     public void removeTokenCookiesFromResponse(HttpServletResponse response) {
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
