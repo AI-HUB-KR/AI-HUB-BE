@@ -157,7 +157,6 @@ public class RefreshTokenService {
 
     // 사용자의 모든 Refresh Token과 연관된 Access Token을 삭제 - 사용자 로그아웃 시
     public void deleteAllByUser(User user) {
-        refreshTokenRepository.deleteByUser(user);
         List<RefreshToken> tokens = refreshTokenRepository.findByUser(user);
         tokens.forEach(token -> revokeToken(token, TokenRevokeReason.USER_LOGOUT));
         accessTokenService.revokeByUser(user, TokenRevokeReason.USER_LOGOUT);
