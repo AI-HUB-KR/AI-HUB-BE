@@ -38,3 +38,5 @@ cookie:
   domain: ""
   secure: false
   same-site: Lax
+  refresh:
+    path: ${COOKIE_REFRESH_PATH:/api/v1/token/refresh}
