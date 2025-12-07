@@ -28,6 +28,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final CookieService cookieService;
 
+    // AccessToken을 활용하여 유저 정보를 가져온 다음, 로그이웃(토큰 폐기 및 쿠키 삭제)을 진행
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
@@ -38,11 +39,9 @@ public class AuthController {
 
         User user = customOauth2User.getUser();
 
-        // 쿠키에서 리프레시 토큰 확인 (없으면 InvalidTokenException 발생 -> 401)
-        Cookie refreshTokenCookie = cookieService.findRefreshTokenCookie(request);
         log.debug("사용자 {} 로그아웃 처리 중", user.getUserId());
 
-        // DB에서 사용자의 모든 토큰 폐기 및 삭제
+        // DB에서 사용자의 모든 토큰(Refresh/Access) 폐기 및 삭제
         refreshTokenService.deleteAllByUser(user);
 
         // 쿠키 삭제

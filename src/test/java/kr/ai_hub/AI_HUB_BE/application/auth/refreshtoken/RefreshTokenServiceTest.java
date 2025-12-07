@@ -105,7 +105,7 @@ class RefreshTokenServiceTest {
         assertThat(result.getAccessToken()).isEqualTo("new-access-token");
         assertThat(result.getRefreshToken()).isEqualTo("new-refresh-token");
         verify(accessTokenService).issueAccessToken(eq(user), eq("new-access-token"), any(RefreshToken.class));
-        verify(refreshTokenRepository, org.mockito.Mockito.times(2)).save(any(RefreshToken.class));
+        verify(refreshTokenRepository, org.mockito.Mockito.times(3)).save(any(RefreshToken.class));
     }
 
     @Test
