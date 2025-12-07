@@ -1465,11 +1465,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "first": {
             "type": "boolean"
@@ -1489,9 +1489,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "paged": {
             "type": "boolean"
           },
@@ -1502,6 +1499,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "unpaged": {
             "type": "boolean"
@@ -1566,11 +1566,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "first": {
             "type": "boolean"
@@ -1782,11 +1782,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "first": {
             "type": "boolean"
@@ -2061,11 +2061,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
-          },
           "pageable": {
             "$ref": "#/components/schemas/Pageablenull"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
           },
           "first": {
             "type": "boolean"
