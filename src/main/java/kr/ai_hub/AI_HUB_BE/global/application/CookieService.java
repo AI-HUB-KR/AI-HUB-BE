@@ -22,6 +22,9 @@ public class CookieService {
     @Value("${cookie.domain:}")
     private String cookieDomain;
 
+    @Value("${cookie.refresh.path}")
+    private String refreshCookiePath;
+
     @Value("${cookie.secure}")
     private boolean cookieSecure;
 
@@ -47,7 +50,7 @@ public class CookieService {
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .path("/api/token/refresh")
+                .path(refreshCookiePath)
                 .maxAge(Duration.ofSeconds(refreshValidityInSeconds))
                 .sameSite(cookieSameSite)
                 .secure(cookieSecure)
