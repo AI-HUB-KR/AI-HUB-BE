@@ -67,6 +67,9 @@ public class RefreshTokenService {
         RefreshToken storedToken;
         try {
             storedToken = validateRefreshToken(user, rawRefreshToken);
+            // 마지막 사용 시간 업데이트
+            storedToken.updateLastUsedAt();
+            refreshTokenRepository.save(storedToken);
         } catch (RefreshTokenInvalidException e) {
             log.warn("사용자 {} 리프레시 토큰 검증 실패: {}", userId, e.getMessage());
             throw e;
