@@ -3,7 +3,9 @@
 cookie:
   domain: aihub.io.kr
   secure: true
-  same-site: None
+  same-site: Lax
+  refresh:
+    path: ${COOKIE_REFRESH_PATH:/api/v1/token/refresh}
 
 spring:
   datasource:

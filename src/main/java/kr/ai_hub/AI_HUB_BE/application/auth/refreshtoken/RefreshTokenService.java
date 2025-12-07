@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -66,6 +67,9 @@ public class RefreshTokenService {
         RefreshToken storedToken;
         try {
             storedToken = validateRefreshToken(user, rawRefreshToken);
+            // 마지막 사용 시간 업데이트
+            storedToken.updateLastUsedAt();
+            refreshTokenRepository.save(storedToken);
         } catch (RefreshTokenInvalidException e) {
             log.warn("사용자 {} 리프레시 토큰 검증 실패: {}", userId, e.getMessage());
             throw e;
@@ -147,16 +151,17 @@ public class RefreshTokenService {
         return refreshTokenRepository.findByTokenHash(tokenHash);
     }
 
-    // Refresh Token 폐기
+    // Refresh Token 폐기 및 연관된 Access Token 폐기
     public void revokeToken(RefreshToken refreshToken, TokenRevokeReason reason) {
         refreshToken.revoke(reason);
         refreshTokenRepository.save(refreshToken);
         accessTokenService.revokeByRefreshToken(refreshToken, reason);
     }
 
-    // 사용자의 모든 Refresh Token 삭제
+    // 사용자의 모든 Refresh Token과 연관된 Access Token을 삭제 - 사용자 로그아웃 시
     public void deleteAllByUser(User user) {
-        refreshTokenRepository.deleteByUser(user);
+        List<RefreshToken> tokens = refreshTokenRepository.findByUser(user);
+        tokens.forEach(token -> revokeToken(token, TokenRevokeReason.USER_LOGOUT));
         accessTokenService.revokeByUser(user, TokenRevokeReason.USER_LOGOUT);
     }
 

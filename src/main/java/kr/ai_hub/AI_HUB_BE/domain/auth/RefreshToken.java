@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "refresh_token", indexes = {
     @Index(name = "idx_refresh_token_hash", columnList = "token_hash"),
     @Index(name = "idx_refresh_token_user_revoked", columnList = "user_id, is_revoked"),
-    @Index(name = "idx_refresh_token_expires_at", columnList = "expires_at")
+    @Index(name = "idx_refresh_token_expires_at", columnList = "expires_at"),
+    @Index(name = "idx_refresh_token_last_used_at", columnList = "last_used_at")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
@@ -51,10 +53,17 @@ public class RefreshToken {
     @Column(name = "revoked_reason", length = 100)
     private TokenRevokeReason revokedReason;
 
+    @Column(name = "last_used_at")
+    private LocalDateTime lastUsedAt;
+
     public void revoke(TokenRevokeReason reason) {
         this.isRevoked = true;
         this.revokedAt = LocalDateTime.now();
         this.revokedReason = reason;
+    }
+
+    public void updateLastUsedAt() {
+        this.lastUsedAt = LocalDateTime.now();
     }
 
     public boolean isExpired() {

@@ -22,6 +22,9 @@ public class CookieService {
     @Value("${cookie.domain:}")
     private String cookieDomain;
 
+    @Value("${cookie.refresh.path}")
+    private String refreshCookiePath;
+
     @Value("${cookie.secure}")
     private boolean cookieSecure;
 
@@ -47,7 +50,7 @@ public class CookieService {
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .path("/api/token/refresh")
+                .path(refreshCookiePath)
                 .maxAge(Duration.ofSeconds(refreshValidityInSeconds))
                 .sameSite(cookieSameSite)
                 .secure(cookieSecure)
@@ -82,7 +85,7 @@ public class CookieService {
         return refreshTokenCookie;
     }
 
-    // 로그아웃 시 토큰 쿠키 삭제
+    // 로그아웃 시 브라우저의 Access/Refresh 토큰 쿠키 삭제(빈 값과 만료 시간 0으로 설정)
     public void removeTokenCookiesFromResponse(HttpServletResponse response) {
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
