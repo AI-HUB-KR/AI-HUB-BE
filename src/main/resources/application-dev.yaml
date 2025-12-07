@@ -4,6 +4,8 @@ cookie:
   domain:  ${COOKIE_DOMAIN:localhost}
   secure: false
   same-site: ${COOKIE_SAME_SITE:Lax}
+  refresh:
+    path: ${COOKIE_REFRESH_PATH:/api/v1/token/refresh}
 
 spring:
   datasource:
