@@ -5,35 +5,36 @@ import lombok.Builder;
 
 /**
  * AI 서버 SSE 이벤트
+ * <p>
+ * AI 서버로부터 수신하는 두 가지 타입의 이벤트:
+ * 1. response: 텍스트 응답 스트리밍 ({"type":"response","data":"텍스트 조각"})
+ * 2. usage: 사용량 메타데이터 ({"type":"usage","data":{...}})
+ * </p>
  *
- * @param type 이벤트 타입 (response.created, response.output_text.delta, response.completed, error)
- * @param response 응답 정보 (response.created, response.completed에서 사용)
- * @param delta 증분 텍스트 (response.output_text.delta에서 사용)
- * @param sequenceNumber 시퀀스 번호
- * @param error 에러 정보 (error 타입일 때 사용)
+ * @param type 이벤트 타입 (response, usage)
+ * @param data 이벤트 데이터 (response일 때 String, usage일 때 UsageData 객체)
  */
 @Builder
 public record SseEvent(
         String type,
-        ResponseInfo response,
-        String delta,
-        @JsonProperty("sequence_number")
-        Integer sequenceNumber,
-        ErrorInfo error
+        Object data
 ) {
+    /**
+     * 사용량 메타데이터 DTO
+     */
     @Builder
-    public record ResponseInfo(
-            String id,
-            String model,
-            String content,
-            AiUsage usage
-    ) {
-    }
+    public record UsageData(
+            @JsonProperty("input_tokens")
+            Integer inputTokens,
 
-    @Builder
-    public record ErrorInfo(
-            String code,
-            String message
+            @JsonProperty("output_tokens")
+            Integer outputTokens,
+
+            @JsonProperty("total_tokens")
+            Integer totalTokens,
+
+            @JsonProperty("response_id")
+            String responseId
     ) {
     }
 }
