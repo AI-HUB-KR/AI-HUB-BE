@@ -1187,6 +1187,26 @@
           }
         }
       },
+      "FileAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "document",
+              "audio"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type"
+        ]
+      },
       "SendMessageRequest": {
         "type": "object",
         "properties": {
@@ -1197,11 +1217,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "fileId": {
-            "type": "string"
-          },
-          "previousResponseId": {
-            "type": "string"
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileAttachment"
+            }
           }
         },
         "required": [
@@ -1465,11 +1485,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "pageable": {
-            "$ref": "#/components/schemas/Pageablenull"
-          },
           "sort": {
             "$ref": "#/components/schemas/Sortnull"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageablenull"
           },
           "first": {
             "type": "boolean"
@@ -1489,6 +1509,9 @@
             "type": "integer",
             "format": "int64"
           },
+          "sort": {
+            "$ref": "#/components/schemas/Sortnull"
+          },
           "paged": {
             "type": "boolean"
           },
@@ -1499,9 +1522,6 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/Sortnull"
           },
           "unpaged": {
             "type": "boolean"
@@ -1566,11 +1586,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "pageable": {
-            "$ref": "#/components/schemas/Pageablenull"
-          },
           "sort": {
             "$ref": "#/components/schemas/Sortnull"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageablenull"
           },
           "first": {
             "type": "boolean"
@@ -1782,11 +1802,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "pageable": {
-            "$ref": "#/components/schemas/Pageablenull"
-          },
           "sort": {
             "$ref": "#/components/schemas/Sortnull"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageablenull"
           },
           "first": {
             "type": "boolean"
@@ -2061,11 +2081,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "pageable": {
-            "$ref": "#/components/schemas/Pageablenull"
-          },
           "sort": {
             "$ref": "#/components/schemas/Sortnull"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/Pageablenull"
           },
           "first": {
             "type": "boolean"
