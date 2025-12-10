@@ -1,6 +1,9 @@
 package kr.ai_hub.AI_HUB_BE.application.chat.message;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.AiUsage;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.FileAttachment;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoom;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,21 +36,44 @@ public class MessageTransactionService {
     private final UserWalletRepository userWalletRepository;
     private final CoinTransactionRepository coinTransactionRepository;
     private final ChatRoomRepository chatRoomRepository;
+    private final ObjectMapper objectMapper;
 
     /**
      * User 메시지를 저장합니다 (별도 트랜잭션).
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Message saveUserMessage(ChatRoom chatRoom, AIModel aiModel, SendMessageRequest request) {
+        // files 배열을 JSON 문자열로 변환하여 저장
+        String fileUrlJson = convertFilesToJson(request.files());
+
         Message userMessage = Message.builder()
                 .chatRoom(chatRoom)
                 .role(MessageRole.USER)
                 .content(request.message())
-                .fileUrl(request.fileId())
+                .fileUrl(fileUrlJson)
                 .aiModel(aiModel)
                 .build();
 
         return messageRepository.save(userMessage);
+    }
+
+    /**
+     * FileAttachment 목록을 JSON 문자열로 변환합니다.
+     *
+     * @param files 파일 첨부 목록
+     * @return JSON 문자열 또는 null (파일이 없는 경우)
+     */
+    private String convertFilesToJson(List<FileAttachment> files) {
+        if (files == null || files.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(files);
+        } catch (JsonProcessingException e) {
+            log.error("파일 정보 JSON 변환 실패: {}", e.getMessage(), e);
+            return null;
+        }
     }
 
     /**

@@ -1,16 +1,18 @@
 package kr.ai_hub.AI_HUB_BE.application.chat.message.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
+import java.util.List;
+
 /**
  * 메시지 전송 요청 DTO
  *
- * @param message 사용자 메시지 내용
- * @param modelId AI 모델 ID
- * @param fileId 업로드된 파일 ID (optional)
- * @param previousResponseId 이전 응답 ID (대화 이어가기, optional)
+ * @param message            사용자 메시지 내용 (필수)
+ * @param modelId            AI 모델 ID (필수)
+ * @param files              첨부 파일 목록 (선택)
  */
 @Builder
 public record SendMessageRequest(
@@ -20,8 +22,7 @@ public record SendMessageRequest(
         @NotNull(message = "모델 ID는 필수입니다")
         Integer modelId,
 
-        String fileId,
-
-        String previousResponseId
+        @Valid
+        List<FileAttachment> files
 ) {
 }

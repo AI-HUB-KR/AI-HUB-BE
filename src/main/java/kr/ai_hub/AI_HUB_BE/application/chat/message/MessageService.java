@@ -1,8 +1,11 @@
 package kr.ai_hub.AI_HUB_BE.application.chat.message;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.*;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.AiStreamingResult;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.FileUploadResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageListItemResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageResponse;
+import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoom;
@@ -19,20 +22,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import reactor.core.publisher.Mono;
-import org.springframework.core.ParameterizedTypeReference;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -50,9 +46,9 @@ public class MessageService {
     private final UserWalletRepository userWalletRepository;
     private final MessageTransactionService messageTransactionService;
     private final SecurityContextHelper securityContextHelper;
-    private final WebClient aiServerWebClient;
-    private final ObjectMapper objectMapper;
-    private final FileValidationService fileValidationService;
+    private final MessageRequestBuilder messageRequestBuilder;
+    private final AiSseHandler aiSseHandler;
+    private final FileUploadService fileUploadService;
 
     /**
      * 특정 채팅방의 메시지 목록을 페이지네이션하여 조회합니다.
@@ -112,18 +108,18 @@ public class MessageService {
             // 1. 요청 검증 및 리소스 조회
             ValidatedMessageContext context = validateMessageRequest(roomId, request);
 
-            // 2. User 메시지 저장 (별도 트랜잭션 서비스 이용)
-            userMessage = messageTransactionService.saveUserMessage(context.chatRoom(), context.aiModel(), request);
-            log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
-
             // SSE 시작 알림
             emitter.send(SseEmitter.event().name("started").data("Message sending started"));
 
-            // 3. 요청 바디 구성
-            Map<String, Object> requestBody = buildRequestBody(request, context.aiModel());
+            // 2. 요청 바디 구성 (이전 채팅 히스토리 포함)
+            Map<String, Object> requestBody = messageRequestBuilder.build(request, context.aiModel(), context.chatRoom());
+
+            // 3. User 메시지 저장 (별도 트랜잭션 서비스 이용)
+            userMessage = messageTransactionService.saveUserMessage(context.chatRoom(), context.aiModel(), request);
+            log.info("User 메시지 저장 완료: messageId={}", userMessage.getMessageId());
 
             // 4. AI 서버로부터 SSE 스트리밍
-            AiStreamingResult streamResult = streamAiResponse(requestBody, emitter);
+            AiStreamingResult streamResult = aiSseHandler.stream(requestBody, emitter);
 
             // 5. 응답 처리 (코인 계산 및 저장 - 별도 트랜잭션 서비스 이용)
             messageTransactionService.processCompletedResponse(
@@ -193,94 +189,6 @@ public class MessageService {
     }
 
     /**
-     * AI 서버로부터 SSE 스트리밍 응답을 처리합니다.
-     */
-    private AiStreamingResult streamAiResponse(Map<String, Object> requestBody, SseEmitter emitter)
-            throws JsonProcessingException, IOException, IllegalStateException {
-        String aiResponseId = null;
-        StringBuilder fullContent = new StringBuilder();
-        AiUsage usage = null;
-
-        var stream = aiServerWebClient.post()
-                .uri("/ai/chat")
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.TEXT_EVENT_STREAM)
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToFlux(String.class)
-                .toStream();
-
-        for (String line : (Iterable<String>) stream::iterator) {
-            if (line == null || line.isBlank()) {
-                continue;
-            }
-            SseEvent event = objectMapper.readValue(line, SseEvent.class);
-
-            switch (event.type()) {
-                case "response.created":
-                    log.info("AI 서버 response.created 이벤트 수신");
-                    if (event.response() != null) {
-                        aiResponseId = event.response().id();
-                        log.debug("AI 응답 생성: id={}", aiResponseId);
-                    }
-                    break;
-
-                case "response.output_text.delta":
-                    if (event.delta() != null) {
-                        fullContent.append(event.delta());
-                        // 클라이언트에게 delta 전달
-                        emitter.send(SseEmitter.event()
-                                .name("delta")
-                                .data(event.delta()));
-                    }
-                    break;
-
-                case "response.completed":
-                    log.info("AI 서버 response.completed 이벤트 수신");
-                    if (event.response() != null) {
-                        usage = event.response().usage();
-                        if (usage != null) {
-                            log.info("AI 응답 완료: tokens={}", usage.totalTokens());
-                        } else {
-                            log.error("usage가 null입니다! response={}", event.response());
-                        }
-                    } else {
-                        log.error("response 객체가 null입니다!");
-                    }
-                    break;
-
-                case "error":
-                    log.info("AI 서버 error 이벤트 수신");
-                    if (event.error() != null) {
-                        log.error("AI 서버 에러: {}", event.error().message());
-                        throw new AIServerException(event.error().message());
-                    }
-                    break;
-            }
-        }
-
-        return new AiStreamingResult(aiResponseId, fullContent.toString(), usage);
-    }
-
-    /**
-     * AI 서버로 전송할 요청 바디를 구성합니다.
-     */
-    private Map<String, Object> buildRequestBody(SendMessageRequest request, AIModel aiModel) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("message", request.message());
-        requestBody.put("model", aiModel.getModelName());
-
-        if (request.fileId() != null) {
-            requestBody.put("file_id", request.fileId());
-        }
-        if (request.previousResponseId() != null) {
-            requestBody.put("previous_response_id", request.previousResponseId());
-        }
-
-        return requestBody;
-    }
-
-    /**
      * 메시지 전송 요청을 검증하고 필요한 리소스를 조회합니다.
      */
     private ValidatedMessageContext validateMessageRequest(UUID roomId, SendMessageRequest request) {
@@ -324,65 +232,7 @@ public class MessageService {
      * @return 파일 업로드 응답 (file ID)
      */
     public FileUploadResponse uploadFile(MultipartFile file, Integer modelId) {
-        log.info("파일 업로드 시작: fileName={}, size={}, modelId={}",
-                file.getOriginalFilename(), file.getSize(), modelId);
-
-        // 파일 검증
-        fileValidationService.validateFile(file);
-
-        // AI 모델 조회
-        AIModel aiModel = aiModelRepository.findById(modelId)
-                .orElseThrow(() -> new ModelNotFoundException("AI 모델을 찾을 수 없습니다: " + modelId));
-        log.debug("AI 모델 조회 성공: modelName={}", aiModel.getModelName());
-
-        // AI 서버에 파일 업로드
-        try {
-            // MultipartBodyBuilder를 사용하여 multipart/form-data 요청 생성
-            MultipartBodyBuilder builder = new MultipartBodyBuilder();
-            builder.part("file", file.getResource());
-
-            // AI 서버에 POST 요청
-            AiServerResponse<AiUploadData> response = aiServerWebClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/ai/upload")
-                            .queryParam("model", aiModel.getModelName())
-                            .build())
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(BodyInserters.fromMultipartData(builder.build()))
-                    .retrieve()
-                    .onStatus(
-                            status -> status.is4xxClientError() || status.is5xxServerError(),
-                            clientResponse -> clientResponse.bodyToMono(
-                                    new ParameterizedTypeReference<AiServerResponse<AiUploadData>>() {})
-                                    .flatMap(errorResponse -> {
-                                        String errorMessage = errorResponse.error() != null
-                                                ? errorResponse.error().message()
-                                                : "AI 서버 응답 에러";
-                                        log.error("AI 서버 파일 업로드 실패: {}", errorMessage);
-                                        return Mono.error(new AIServerException(errorMessage));
-                                    })
-                    )
-                    .bodyToMono(new ParameterizedTypeReference<AiServerResponse<AiUploadData>>() {})
-                    .block(Duration.ofSeconds(30));  // 30초 타임아웃 명시
-
-            if (response == null || !response.success() || response.data() == null) {
-                log.error("AI 서버 응답 없음 또는 실패");
-                throw new AIServerException("AI 서버로부터 응답을 받지 못했습니다");
-            }
-
-            AiUploadData uploadData = response.data();
-            String fileId = uploadData.fileId();
-            log.info("파일 업로드 성공: fileId={}", fileId);
-
-            return FileUploadResponse.of(fileId);
-
-        } catch (Exception e) {
-            log.error("파일 업로드 중 에러 발생: {}", e.getMessage(), e);
-            if (e instanceof AIServerException) {
-                throw e;
-            }
-            throw new AIServerException("파일 업로드 중 에러가 발생했습니다: " + e.getMessage(), e);
-        }
+        return fileUploadService.uploadFile(file, modelId);
     }
 
 
@@ -394,14 +244,7 @@ public class MessageService {
             ChatRoom chatRoom,
             AIModel aiModel,
             UserWallet wallet
-    ) {}
+    ) {
+    }
 
-    /**
-     * AI 서버 SSE 스트리밍 결과를 담는 DTO
-     */
-    private record AiStreamingResult(
-            String aiResponseId,
-            String fullContent,
-            AiUsage usage
-    ) {}
 }
