@@ -164,7 +164,7 @@ public class MessageService {
         completedData.put("aiResponseId", result.aiResponseId());
         completedData.put("inputTokens", result.usage().inputTokens());
         completedData.put("outputTokens", result.usage().outputTokens());
-        emitter.send(SseEmitter.event().name("completed").data(completedData));
+        emitter.send(SseEmitter.event().name("usage").data(completedData));
         emitter.complete();
     }
 
