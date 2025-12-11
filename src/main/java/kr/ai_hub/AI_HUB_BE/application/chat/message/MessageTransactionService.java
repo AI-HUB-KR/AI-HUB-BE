@@ -142,13 +142,12 @@ public class MessageTransactionService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public BigDecimal deductBalance(Integer userId, BigDecimal amount) {
+    public void deductBalance(Integer userId, BigDecimal amount) {
         UserWallet wallet = userWalletRepository.findByUserUserId(userId)
                 .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
 
         wallet.deductBalance(amount);
 
-        return wallet.getBalance();  // 차감 후 잔액 반환
     }
 
     /**
