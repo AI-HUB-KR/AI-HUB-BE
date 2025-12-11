@@ -95,8 +95,8 @@ public class MessageTransactionService {
         UserWallet wallet = userWalletRepository.findByUserUserId(user.getUserId())
                 .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
 
-        // 코인 차감
-        wallet.deductBalance(totalCoin);
+        // 코인 차감 (별도 트랜잭션 - 롤백 안 됨)
+        deductBalance(user.getUserId(), totalCoin);
 
         // Assistant 메시지 저장
         Message assistantMessage = Message.builder()
@@ -141,6 +141,16 @@ public class MessageTransactionService {
         log.info("코인 차감 및 메시지 저장 완료: totalCoin={}, balance={}", totalCoin, wallet.getBalance());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BigDecimal deductBalance(Integer userId, BigDecimal amount) {
+        UserWallet wallet = userWalletRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("지갑을 찾을 수 없습니다"));
+
+        wallet.deductBalance(amount);
+
+        return wallet.getBalance();  // 차감 후 잔액 반환
+    }
+
     /**
      * User 메시지를 삭제합니다 (보상 트랜잭션).
      */
@@ -148,8 +158,8 @@ public class MessageTransactionService {
     public void deleteUserMessage(Message userMessage) {
         // 다시 조회해서 삭제해야 안전함 (Detached 상태일 수 있음)
         if (userMessage.getMessageId() != null) {
-             messageRepository.findById(userMessage.getMessageId())
-                     .ifPresent(messageRepository::delete);
+            messageRepository.findById(userMessage.getMessageId())
+                    .ifPresent(messageRepository::delete);
         }
         log.debug("User 메시지 삭제: messageId={}", userMessage.getMessageId());
     }
