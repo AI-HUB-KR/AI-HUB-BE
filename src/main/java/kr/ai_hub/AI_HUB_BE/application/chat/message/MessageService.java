@@ -128,8 +128,10 @@ public class MessageService {
                     streamResult.usage()
             );
 
-            // 6. 완료 이벤트 전달
-            sendCompletionEvent(emitter, userMessage, streamResult);
+            // 6. 완료 이벤트 전달 및 Emitter 종료
+            emitter.send(SseEmitter.event().name("usage").data(streamResult));
+            emitter.complete();
+
             log.info("메시지 전송 완료: roomId={}", roomId);
 
         } catch (JsonProcessingException e) {
@@ -152,20 +154,6 @@ public class MessageService {
             log.error("예상치 못한 에러: {}", e.getMessage(), e);
             handleMessageError(userMessage, e, emitter);
         }
-    }
-
-    /**
-     * 완료 이벤트를 클라이언트에게 전송합니다.
-     */
-    private void sendCompletionEvent(SseEmitter emitter, Message userMessage, AiStreamingResult result)
-            throws IOException {
-        Map<String, Object> completedData = new HashMap<>();
-        completedData.put("userMessageId", userMessage.getMessageId());
-        completedData.put("aiResponseId", result.aiResponseId());
-        completedData.put("inputTokens", result.usage().inputTokens());
-        completedData.put("outputTokens", result.usage().outputTokens());
-        emitter.send(SseEmitter.event().name("completed").data(completedData));
-        emitter.complete();
     }
 
     /**

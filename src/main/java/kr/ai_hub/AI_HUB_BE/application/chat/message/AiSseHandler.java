@@ -59,8 +59,8 @@ public class AiSseHandler {
                         String textChunk = event.data().toString();
                         fullContent.append(textChunk);
                         emitter.send(SseEmitter.event()
-                                .name("delta")
-                                .data(textChunk));
+                                .name(event.type())
+                                .data(event));
                     }
                     break;
 
