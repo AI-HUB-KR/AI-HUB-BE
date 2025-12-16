@@ -39,23 +39,27 @@ public class CookieService {
 
     // 토큰 받아서 쿠키 만들어 응답에 추가
     public void addTokenCookiesToResponse(HttpServletResponse response, User user, String refreshToken, String accessToken) {
-        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", accessToken)
+        ResponseCookie.ResponseCookieBuilder accessTokenCookieBuilder = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
                 .path("/")
                 .maxAge(Duration.ofSeconds(accessValidityInSeconds))
                 .sameSite(cookieSameSite)
-                .secure(cookieSecure)
-                .domain(cookieDomain)
-                .build();
+                .secure(cookieSecure);
+        if (StringUtils.hasText(cookieDomain)) {
+            accessTokenCookieBuilder.domain(cookieDomain);
+        }
+        ResponseCookie accessTokenCookie = accessTokenCookieBuilder.build();
 
-        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
+        ResponseCookie.ResponseCookieBuilder refreshTokenCookieBuilder = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
                 .path(refreshCookiePath)
                 .maxAge(Duration.ofSeconds(refreshValidityInSeconds))
                 .sameSite(cookieSameSite)
-                .secure(cookieSecure)
-                .domain(cookieDomain)
-                .build();
+                .secure(cookieSecure);
+        if (StringUtils.hasText(cookieDomain)) {
+            refreshTokenCookieBuilder.domain(cookieDomain);
+        }
+        ResponseCookie refreshTokenCookie = refreshTokenCookieBuilder.build();
 
         // [쿠키] 응답에 담기
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
@@ -87,19 +91,27 @@ public class CookieService {
 
     // 로그아웃 시 브라우저의 Access/Refresh 토큰 쿠키 삭제(빈 값과 만료 시간 0으로 설정)
     public void removeTokenCookiesFromResponse(HttpServletResponse response) {
-        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", "")
+        ResponseCookie.ResponseCookieBuilder accessTokenCookieBuilder = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
-                .build();
+                .sameSite(cookieSameSite)
+                .secure(cookieSecure);
+        if (StringUtils.hasText(cookieDomain)) {
+            accessTokenCookieBuilder.domain(cookieDomain);
+        }
+        ResponseCookie accessTokenCookie = accessTokenCookieBuilder.build();
 
-        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", "")
+        ResponseCookie.ResponseCookieBuilder refreshTokenCookieBuilder = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .path("/api/token/refresh")
+                .path(refreshCookiePath)
                 .maxAge(0)
-                .sameSite("Strict")
-                .build();
+                .sameSite(cookieSameSite)
+                .secure(cookieSecure);
+        if (StringUtils.hasText(cookieDomain)) {
+            refreshTokenCookieBuilder.domain(cookieDomain);
+        }
+        ResponseCookie refreshTokenCookie = refreshTokenCookieBuilder.build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
