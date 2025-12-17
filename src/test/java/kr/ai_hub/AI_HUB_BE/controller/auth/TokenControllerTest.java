@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -72,7 +73,7 @@ class TokenControllerTest {
                 .with(csrf()))
                 .andExpect(status().isOk());
 
-        verify(cookieService).addTokenCookiesToResponse(any(HttpServletResponse.class), any(User.class),
+        verify(cookieService).addTokenCookiesToResponse(any(HttpServletResponse.class), nullable(User.class),
                 eq("new-refresh-token"), eq("new-access-token"));
     }
 
