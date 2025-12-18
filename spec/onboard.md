@@ -23,11 +23,6 @@ AI Hub는 여러 AI API(OpenAI, Anthropic, Google AI 등)를 **코인 기반 선
 
 애플리케이션이 부팅되려면 최소 아래 값이 필요합니다(특히 OAuth2).
 
-```bash
-export KAKAO_CLIENT_ID="your_kakao_client_id"
-export KAKAO_CLIENT_SECRET="your_kakao_client_secret"
-```
-
 > 로컬에서 `.env`를 쓰고 싶다면(권장): `.env`는 `.gitignore`에 포함되어 있으므로 개인 환경에서만 관리하세요.  
 > zsh/bash 예시: `set -a; source .env; set +a`
 
@@ -36,10 +31,10 @@ export KAKAO_CLIENT_SECRET="your_kakao_client_secret"
 ```bash
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
+JWT_SECRET=...
+JWT_EXPIRATION_SECOND=7200
+JWT_REFRESH_EXPIRATION_SECOND=2592000
 AI_SERVER_URL=http://localhost:3000
-FRONTEND_ADDRESS=http://localhost:3000
-DEPLOYMENT_ADDRESS=http://localhost:8080
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:8080
 ```
 
 ### 1-3. 실행
@@ -58,25 +53,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhos
 
 ```bash
 ./gradlew test
-./gradlew bootJar
-./gradlew generateOpenApiDocs
 ```
-
-### 1-6. (옵션) Docker로 실행
-
-```bash
-docker build -t ai-hub-be:local .
-
-docker run --rm -p 8080:8080 \
-  -e SPRING_PROFILES_ACTIVE=dev \
-  -e KAKAO_CLIENT_ID=your_kakao_client_id \
-  -e KAKAO_CLIENT_SECRET=your_kakao_client_secret \
-  -e AI_SERVER_URL=http://host.docker.internal:3000 \
-  ai-hub-be:local
-```
-
-> `host.docker.internal`은 Docker Desktop(Mac/Windows)에서 주로 동작합니다. 리눅스라면 호스트 IP로 바꿔주세요.
-
 ---
 
 ## 2) 로컬 개발에서 “로그인”을 어떻게 하나요?
@@ -254,17 +231,7 @@ PR을 만들 때 브랜치 규칙 위반 시 `branch-rule.yaml` 워크플로우�
 
 ---
 
-## 10) 자주 겪는 이슈(트러블슈팅)
-
-- **앱이 부팅 중 죽음**: `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` 미설정 가능성이 큼
-- **로그인은 됐는데 API가 401/403**: `SecurityConfig`에서 허용된 경로 외에는 인증 필요(기본 `anyRequest().authenticated()`)
-- **리프레시가 동작 안 함**: `refreshToken` 쿠키가 `path=/api/v1/token/refresh` 인지 확인
-- **쿠키/CORS 문제**: `sdd/troubleshoot/cookie-cross-domain.md` 참고
-- **SSE가 끊김/멈춤**: AI 서버 실행 여부, `AI_SERVER_URL`, 네트워크/프록시, 타임아웃(5분) 확인
-
----
-
-## 11) “더 읽을 것” (추천 순서)
+## 10) “더 읽을 것” (추천 순서)
 
 1. `spec/onboard.md` (현재 문서)
 2. `spec/codebase-structure.md` (패키지/엔드포인트 맵)
