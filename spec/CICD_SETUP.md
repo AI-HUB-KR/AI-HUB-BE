@@ -6,7 +6,7 @@
 
 ## 📋 파이프라인 개요
 
-- PR/main: 테스트(CI)만 실행
+- PR: 테스트(CI)만 실행 (`main`, `dev`, `release/**` 대상으로)
 - main 브랜치 push: 테스트 → 이미지 빌드/푸시 → 매니페스트(values.yaml) 이미지 태그 업데이트까지 실행(CICD)
 
 ### 워크플로우 구조
@@ -37,8 +37,8 @@
 - ✅ 기타 모든 OCI 호환 컨테이너 런타임
 
 ### 트리거 조건
-- **Push**: `main`, `develop` 브랜치에 푸시될 때
-- **Pull Request**: `main`, `develop` 브랜치로의 PR 생성 시
+- **Push**: `main`, `dev`, `release/**` 브랜치에 푸시될 때
+- **Pull Request**: `main`, `dev`, `release/**` 브랜치로의 PR 생성 시
 
 ---
 
@@ -112,15 +112,14 @@ Helm 차트로 관리됩니다.
 ```
 k8s-manifests/
 ├── Chart.yaml       # 차트 메타데이터
-├── values.yaml      # 네임스페이스/DB/애플리케이션 기본값 (image.tag 포함)
+├── values.yaml      # 네임스페이스/DB/애플리케이션 기본값 (springApp.image 포함)
 └── templates/       # Kubernetes 리소스 템플릿
 ```
 
-`values.yaml` 내 `image.tag`가 GitHub Actions에서 자동으로 커밋/푸시되며, Helm 템플릿은 이 값을 참조해 배포 시점 이미지 태그를 가져갑니다. 예시:
+`values.yaml` 내 `springApp.image`가 GitHub Actions에서 자동으로 커밋/푸시되며, Helm 템플릿은 이 값을 참조해 배포 시점 이미지 태그를 가져갑니다. 예시:
 ```yaml
-image:
-  repository: ghcr.io/username/ai-hub-be
-  tag: latest          # ← CI에서 SHA로 자동 교체
+springApp:
+  image: ghcr.io/username/main-server:latest  # ← CI에서 SHA로 자동 교체
 
 namespace: ai-hub
 database:
@@ -133,7 +132,7 @@ database:
 
 ### 매니페스트 업데이트 경로 수정
 
-`.github/workflows/ci-cd.yml` 파일에서 `update-manifest` Job의 경로를 수정하세요:
+`.github/workflows/cicd.yaml` 파일에서 `update-manifest` Job의 경로를 수정하세요:
 
 
 ### 브랜치 전략 변경

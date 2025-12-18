@@ -1,3 +1,36 @@
+# MSA AI 서버 연동
+
+> ✅ 최신 스펙: `### (NEW) MSA AI 서버 최신 내용(아래)` 이하를 기준으로 합니다.  
+> (NEW 섹션 이전의 내용은 레거시/참고용이며, 현재 AI-HUB-BE 코드와 불일치할 수 있습니다.)
+
+## AI-HUB-BE 연동 (현재 코드 기준)
+
+### Base URL
+- `AI_SERVER_URL` (Spring 설정: `ai-server.url`)
+
+### 1) 파일 업로드
+- `POST /ai/upload?model={modelName}`
+- Content-Type: `multipart/form-data`
+- Form field: `file`
+
+### 2) 채팅 (SSE 스트리밍)
+- `POST /ai/chat`
+- Headers: `Content-Type: application/json`, `Accept: text/event-stream`
+- Request body 예시:
+```json
+{
+  "message": "안녕하세요",
+  "model": "gpt-5-mini",
+  "files": [{"id":"file-6790eafb85d4290001fe6e92","type":"image"}],
+  "history": [{"role":"user","content":"이 이미지를 분석해줘"}],
+  "conversationId": "resp_abc123"
+}
+```
+- 파일 타입: `image`, `document`, `audio`
+- 스트리밍 이벤트(예): `{"type":"response","data":"텍스트 조각"}`, `{"type":"usage","data":{...}}`
+
+---
+
 ### 모델 기반 제공자 선택
 
 - API 호출 시 `model` 파라미터로 사용할 AI 제공자가 자동으로 결정됨
@@ -531,3 +564,456 @@ curl -X GET "http://localhost:3000/ai/response?id=resp_abc123&model=gpt-5-mini"
 # 응답:
 # {"success": true, "data": {"id": "resp_abc123", "content": "...", "usage": {"total_tokens": 150}}}
 ```
+
+
+
+### (NEW) MSA AI 서버 최신 내용(아래)
+# ErrorCode 가이드
+
+이 문서는 AI API Server에서 반환하는 오류 응답의 `errorCode` 값과 의미를 정리합니다.
+
+- 소스(기준): `src/common/exceptions/ai.exceptions.ts`
+- 일부 `errorCode`는 호출부에서 직접 지정합니다.
+- 오류 응답 형식: `docs/API_RESPONSE_FORMAT.md`
+
+---
+
+## ErrorCode 목록
+
+| ErrorCode | HTTP 상태 | 의미 | `details` 예시(선택) |
+|---|---:|---|---|
+| `INVALID_MODEL` | 400 | 요청한 모델명이 유효하지 않음 | `requestedModel`, `supportedModels` |
+| `EMPTY_MESSAGE` | 400 | 채팅 메시지 내용이 비어있음 | - |
+| `INVALID_PROVIDER` | 400 | 요청한 AI 제공자가 유효하지 않음 | `provider` |
+| `UNSUPPORTED_FILE_FORMAT` | 400 | 업로드 파일 확장자가 지원되지 않음 | `fileExtension`, `supportedFormats` |
+| `PROVIDER_UNAVAILABLE` | 503 | AI 제공자 서비스 사용 불가(점검/장애 등) | `provider`, `reason` |
+| `OPERATION_NOT_SUPPORTED` | 501 | 해당 제공자가 기능을 지원하지 않음(예: `retrieveResponse`) | `provider`, `operation` |
+| `STREAM_CONNECTION_FAILED` | 502 | 스트림 연결 실패 | `provider`, `reason` |
+| `STREAM_INTERRUPTED` | 500 | 스트림 중단(연결 끊김/서버 중단 등) | `provider`, `reason` |
+| `STREAM_TIMEOUT` | 504 | 스트림 응답 시간 초과 | `provider`, `timeoutMs` |
+| `STREAM_PARSING_FAILED` | 500 | 스트림 이벤트 파싱 실패 | `provider`, `eventType`, `reason` |
+| `FILE_PROCESSING_FAILED` | 500 | 파일 업로드/처리 중 오류 | `filename`, `reason` |
+| `EXTERNAL_SERVICE_FAILED` | 502 | 외부 서비스(업스트림) 호출 실패 | `serviceName`, `reason` |
+| `INTERNAL_SERVER_ERROR` | 500 | 내부 서버 오류(예상치 못한 오류) | (상황별 상이) |
+
+---
+
+## `details` 필드 가이드
+
+- `details`는 선택이며, 클라이언트가 분기 처리/디버깅에 활용할 수 있는 추가 컨텍스트를 제공합니다.
+- `details`의 키/구조는 오류 종류에 따라 달라질 수 있습니다.
+
+
+# API 응답 형식 가이드
+
+이 문서는 AI API Server의 정상 응답과 오류 응답 형식을 설명합니다.
+
+---
+
+## 목차
+
+1. [정상 응답](#정상-응답)
+   - [채팅 API (SSE 스트리밍)](#1-채팅-api-sse-스트리밍)
+   - [파일 업로드 API](#2-파일-업로드-api)
+   - [응답 조회 API](#3-응답-조회-api)
+2. [오류 응답](#오류-응답)
+   - [오류 응답 구조](#오류-응답-구조)
+   - [오류 코드 목록](#오류-코드-목록)
+   - [HTTP 상태 코드별 오류](#http-상태-코드별-오류)
+3. [SSE 스트리밍 오류 처리](#sse-스트리밍-오류-처리)
+
+---
+
+## 정상 응답
+
+### 1. 채팅 API (SSE 스트리밍)
+
+**엔드포인트**: `POST /ai/chat`
+
+**Content-Type**: `text/event-stream`
+
+채팅 API는 Server-Sent Events(SSE)를 통해 실시간 스트리밍 응답을 제공합니다.
+
+#### 스트림 이벤트 형식
+
+각 이벤트는 `data: {JSON}\n\n` 형식으로 전송됩니다.
+
+##### 응답 이벤트 (텍스트 청크)
+
+```json
+data: {"type":"response","data":"안녕"}
+
+data: {"type":"response","data":"하세요"}
+
+data: {"type":"response","data":"! 무엇을 도와드릴까요?"}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `type` | `"response"` | 이벤트 타입 (텍스트 응답) |
+| `data` | `string` | AI가 생성한 텍스트 청크 |
+
+##### 사용량 이벤트 (스트림 종료 시)
+
+```json
+data: {"type":"usage","data":{"input_tokens":25,"output_tokens":42,"total_tokens":67,"response_id":"resp_abc123xyz"}}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `type` | `"usage"` | 이벤트 타입 (사용량 정보) |
+| `data.input_tokens` | `number` | 입력(프롬프트) 토큰 수 |
+| `data.output_tokens` | `number` | 출력(응답) 토큰 수 |
+| `data.total_tokens` | `number` | 총 토큰 수 |
+| `data.response_id` | `string` | 응답 고유 ID (OpenAI만 지원) |
+
+#### 전체 스트림 예시
+
+```
+data: {"type":"response","data":"안녕"}
+
+data: {"type":"response","data":"하세요! "}
+
+data: {"type":"response","data":"오늘 "}
+
+data: {"type":"response","data":"날씨가 좋네요."}
+
+data: {"type":"usage","data":{"input_tokens":10,"output_tokens":15,"total_tokens":25,"response_id":"resp_abc123"}}
+```
+
+---
+
+### 2. 파일 업로드 API
+
+**엔드포인트**: `POST /ai/upload?model={모델명}`
+
+**Content-Type**: `application/json`
+
+#### 성공 응답
+
+```json
+{
+  "success": true,
+  "data": {
+    "file_id": "file-abc123xyz"
+  },
+  "metadata": {
+    "provider": "openai",
+    "timestamp": "2025-12-16T10:30:00.000Z"
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `success` | `boolean` | 요청 성공 여부 |
+| `data.file_id` | `string` | 업로드된 파일 ID (채팅 시 사용) |
+| `metadata.provider` | `string` | AI 제공자 (`openai`, `claude`, `gemini`) |
+| `metadata.timestamp` | `string` | 업로드 시각 (ISO 8601) |
+
+> **참고**: Gemini의 경우 `file_id` 대신 `uri` 형식이 반환됩니다.
+
+---
+
+### 3. 응답 조회 API
+
+**엔드포인트**: `GET /ai/response?id={응답ID}&model={모델명}`
+
+**Content-Type**: `application/json`
+
+> **참고**: 현재 OpenAI만 응답 조회를 지원합니다.
+
+#### 성공 응답
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "resp_abc123xyz",
+    "content": "AI가 생성한 전체 응답 텍스트입니다.",
+    "model": "gpt-5-mini",
+    "provider": "openai",
+    "usage": {
+      "input_tokens": 25,
+      "output_tokens": 42,
+      "total_tokens": 67,
+      "response_id": "resp_abc123xyz"
+    },
+    "timestamp": "2025-12-16T10:30:00.000Z"
+  },
+  "metadata": {
+    "provider": "openai",
+    "timestamp": "2025-12-16T10:35:00.000Z"
+  }
+}
+```
+
+---
+
+## 오류 응답
+
+### 오류 응답 구조
+
+모든 오류는 일관된 JSON 구조로 반환됩니다.
+
+```json
+{
+  "errorCode": "ERROR_CODE",
+  "message": "사람이 읽을 수 있는 오류 메시지",
+  "details": {
+    "추가": "정보"
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `errorCode` | `string` | ✅ | 프로그래밍 방식으로 처리할 수 있는 오류 코드 |
+| `message` | `string` | ✅ | 사용자에게 표시할 오류 메시지 (한글) |
+| `details` | `object` | ❌ | 오류에 대한 추가 컨텍스트 정보 |
+| `timestamp` | `string` | ✅ | 오류 발생 시각 (ISO 8601) |
+
+---
+
+### 오류 코드 목록
+
+> 전체 ErrorCode 목록과 의미는 `docs/ERROR_CODES.md`를 참고하세요.
+
+#### 유효성 검증 오류 (400 Bad Request)
+
+| 오류 코드 | 메시지 | 설명 |
+|-----------|--------|------|
+| `INVALID_MODEL` | 지원하지 않는 모델입니다: {model} | 요청한 모델명이 유효하지 않음 |
+| `EMPTY_MESSAGE` | 메시지 내용이 비어있습니다. | 채팅 메시지가 비어있음 |
+| `INVALID_PROVIDER` | Invalid AI provider: {provider} | 요청한 제공자 값이 유효하지 않음 |
+| `UNSUPPORTED_FILE_FORMAT` | 지원하지 않는 형식: {ext} | 업로드 파일 확장자가 지원되지 않음 |
+
+**예시: 잘못된 모델 요청**
+
+```json
+{
+  "errorCode": "INVALID_MODEL",
+  "message": "지원하지 않는 모델입니다: gpt-unknown",
+  "details": {
+    "requestedModel": "gpt-unknown",
+    "supportedModels": ["gpt-4o", "gpt-4o-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.1", "claude-haiku-4-5", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-pro-preview"]
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+#### 기능 미지원 (501 Not Implemented)
+
+| 오류 코드 | 메시지 | 설명 |
+|-----------|--------|------|
+| `OPERATION_NOT_SUPPORTED` | {provider} 제공자는 해당 기능을 지원하지 않습니다. | 제공자에서 해당 기능을 구현하지 않음 |
+
+**예시: 응답 조회 미지원**
+
+```json
+{
+  "errorCode": "OPERATION_NOT_SUPPORTED",
+  "message": "Claude 제공자는 응답 검색을 지원하지 않습니다. 이 기능을 위해 OpenAI 제공자를 사용하세요.",
+  "details": {
+    "provider": "claude",
+    "operation": "retrieveResponse"
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+#### 제공자 오류 (503 Service Unavailable)
+
+| 오류 코드 | 메시지 | 설명 |
+|-----------|--------|------|
+| `PROVIDER_UNAVAILABLE` | AI 제공자 서비스를 사용할 수 없습니다: {provider} | AI 제공자 API가 다운되었거나 점검 중 |
+
+**예시: 제공자 서비스 불가**
+
+```json
+{
+  "errorCode": "PROVIDER_UNAVAILABLE",
+  "message": "AI 제공자 서비스를 사용할 수 없습니다: openai",
+  "details": {
+    "provider": "openai",
+    "reason": "API 서버 점검 중"
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+#### 스트리밍 오류 (500/502/504)
+
+| 오류 코드 | HTTP 상태 | 메시지 |
+|-----------|-----------|--------|
+| `STREAM_CONNECTION_FAILED` | 502 | 스트림 연결에 실패했습니다: {provider} |
+| `STREAM_INTERRUPTED` | 500 | 스트림이 중단되었습니다: {provider} |
+| `STREAM_TIMEOUT` | 504 | 스트림 응답 시간이 초과되었습니다: {provider} |
+| `STREAM_PARSING_FAILED` | 500 | 스트림 이벤트 파싱에 실패했습니다: {provider} |
+
+**예시: 스트림 타임아웃**
+
+```json
+{
+  "errorCode": "STREAM_TIMEOUT",
+  "message": "스트림 응답 시간이 초과되었습니다: openai",
+  "details": {
+    "provider": "openai",
+    "timeoutMs": 30000
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+#### 리소스 오류 (500)
+
+| 오류 코드 | 메시지 | 설명 |
+|-----------|--------|------|
+| `FILE_PROCESSING_FAILED` | 파일 처리 중 오류가 발생했습니다: {filename} | 파일 업로드/처리 실패 |
+
+**예시: 파일 처리 실패**
+
+```json
+{
+  "errorCode": "FILE_PROCESSING_FAILED",
+  "message": "파일 처리 중 오류가 발생했습니다: document.pdf",
+  "details": {
+    "filename": "document.pdf",
+    "reason": "OpenAI 파일 업로드 실패: 네트워크 연결 시간 초과"
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+#### 내부 오류 (500/502)
+
+| 오류 코드 | HTTP 상태 | 메시지 |
+|-----------|-----------|--------|
+| `EXTERNAL_SERVICE_FAILED` | 502 | 외부 서비스 연결에 실패했습니다: {serviceName} |
+| `INTERNAL_SERVER_ERROR` | 500 | 내부 서버 오류가 발생했습니다: {message} |
+
+**예시: 외부 서비스 연결 실패**
+
+```json
+{
+  "errorCode": "EXTERNAL_SERVICE_FAILED",
+  "message": "외부 서비스 연결에 실패했습니다: OpenAI API",
+  "details": {
+    "serviceName": "OpenAI API",
+    "reason": "네트워크 연결 시간 초과"
+  },
+  "timestamp": "2025-12-16T10:30:00.000Z"
+}
+```
+
+---
+
+### HTTP 상태 코드별 오류
+
+| 상태 코드 | 의미 | 관련 오류 |
+|-----------|------|-----------|
+| `400` | Bad Request | `INVALID_MODEL`, `EMPTY_MESSAGE`, `INVALID_PROVIDER`, `UNSUPPORTED_FILE_FORMAT` |
+| `501` | Not Implemented | `OPERATION_NOT_SUPPORTED` |
+| `500` | Internal Server Error | `STREAM_INTERRUPTED`, `STREAM_PARSING_FAILED`, `FILE_PROCESSING_FAILED`, `INTERNAL_SERVER_ERROR` |
+| `502` | Bad Gateway | `STREAM_CONNECTION_FAILED`, `EXTERNAL_SERVICE_FAILED` |
+| `503` | Service Unavailable | `PROVIDER_UNAVAILABLE` |
+| `504` | Gateway Timeout | `STREAM_TIMEOUT` |
+
+---
+
+## SSE 스트리밍 오류 처리
+
+채팅 API에서 스트리밍 중 오류가 발생하면, 특별한 오류 이벤트가 전송됩니다.
+
+### 스트리밍 오류 이벤트
+
+```json
+data: {"type":"error","error":{"code":"CHAT_ERROR","message":"스트림 채팅 실패: 연결이 끊어졌습니다"}}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `type` | `"error"` | 이벤트 타입 (오류) |
+| `error.code` | `string` | 오류 코드 |
+| `error.message` | `string` | 오류 메시지 |
+
+### 클라이언트 처리 예시 (JavaScript)
+
+```javascript
+const eventSource = new EventSource('/ai/chat');
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  switch (data.type) {
+    case 'response':
+      // 텍스트 청크 처리
+      console.log('텍스트:', data.data);
+      break;
+
+    case 'usage':
+      // 사용량 정보 (스트림 종료)
+      console.log('토큰 사용량:', data.data);
+      eventSource.close();
+      break;
+
+    case 'error':
+      // 오류 처리
+      console.error('오류 발생:', data.error.message);
+      eventSource.close();
+      break;
+  }
+};
+
+eventSource.onerror = (error) => {
+  console.error('SSE 연결 오류:', error);
+  eventSource.close();
+};
+```
+
+---
+
+## 오류 계층 구조
+
+```
+BaseAiException (기본 예외)
+│
+├── AiValidationException (400)
+│   ├── InvalidModelException
+│   └── EmptyMessageException
+│
+├── AiProviderException (501/502/503)
+│   └── ProviderUnavailableException
+│
+├── AiStreamException (500/502/504)
+│   ├── StreamConnectionException
+│   ├── StreamInterruptedException
+│   ├── StreamTimeoutException
+│   └── StreamParsingException
+│
+├── AiResourceException
+│   └── FileProcessingException
+│
+└── AiInternalException (500/502)
+    ├── ExternalServiceException
+    └── InternalServerException
+```
+
+---
+
+## 버전 정보
+
+- **문서 버전**: 1.0.0
+- **최종 업데이트**: 2025-12-16
+- **작성자**: AI API Server 팀

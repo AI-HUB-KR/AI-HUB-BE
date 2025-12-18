@@ -5,11 +5,11 @@
 AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 
 #### 1. User (사용자)
-- **테이블명**: `user`
+- **테이블명**: `"user"` (예약어이므로 따옴표 처리)
 - **주요 필드**:
   - `user_id` (INT, PK): 사용자 고유 ID
   - `username` (VARCHAR(50)): 사용자명
-  - `role` (VARCHAR(20)): 사용자 역할 (예: admin, user)
+  - `role` (VARCHAR(20)): 사용자 역할 (UserRole: ROLE_USER, ROLE_ADMIN)
   - `email` (VARCHAR(255)): 이메일
   - `kakao_id` (VARCHAR(255)): 카카오 사용자 고유 ID (유니크)
   - `profile_image_url` (VARCHAR(500)): 프로필 이미지 URL
@@ -28,7 +28,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `created_at`, `updated_at` (TIMESTAMP): 생성/수정 시간
 - **비고**:
   - 도메인 메서드: `addCoinUsage(BigDecimal amount)` - 코인 사용량 누적
-- **관계**: User와 N:1 관계 (cascade delete)
+- **관계**: User와 N:1 관계
 
 #### 3. Message (메시지)
 - **테이블명**: `message`
@@ -44,11 +44,11 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `response_id` (VARCHAR(100)): AI 서버 응답 ID (대화 연결용)
   - `created_at` (TIMESTAMP): 생성 시간
 - **비고**:
-  - `role` 필드는 MessageRole Enum (USER, ASSISTANT)을 사용하며, DB에는 "user", "assistant" 문자열로 저장됨
+  - `role` 필드는 MessageRole Enum (USER, ASSISTANT)을 사용하며, DB에는 "USER", "ASSISTANT" 문자열로 저장됨 (EnumType.STRING)
   - `response_id`는 AI 서버가 생성한 응답 ID로, 대화 맥락 연결에 사용됨
   - 도메인 메서드: `updateTokenAndCoin()`, `updateResponseId()`
 - **관계**:
-  - ChatRoom과 N:1 관계 (cascade delete)
+  - ChatRoom과 N:1 관계
   - AIModel과 N:1 관계
 
 #### 4. RefreshToken (리프레시 토큰)
@@ -62,11 +62,12 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `is_revoked` (BOOLEAN): 폐기 여부
   - `revoked_at` (TIMESTAMP): 폐기 시간
   - `revoked_reason` (VARCHAR(100)): 폐기 사유
+  - `last_used_at` (TIMESTAMP): 마지막 사용 시간
 - **비고**: 원본 리프레시 토큰은 노출을 방지하기 위해 SHA-256으로 해시하여 저장하며,
   로그인/토큰 재발급 시 동일한 해시 값이 존재하고 폐기되지 않았는지 검증한다. 토큰 재발급 시 기존 토큰은
   `is_revoked=true`로 상태를 갱신하고 신규 토큰 해시를 저장한다. `revoked_reason` 필드는 `TokenRevokeReason`
   enum(`ROTATED`, `EXPIRED`, `USER_LOGOUT`) 값을 문자열로 보관한다.
-- **관계**: User와 N:1 관계 (cascade delete)
+- **관계**: User와 N:1 관계
 
 #### 5. AccessToken (액세스 토큰)
 - **테이블명**: `access_token`
@@ -84,8 +85,8 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **비고**: 원본 액세스 토큰은 외부 노출 방지를 위해 SHA-256으로 해시하여 저장하며, 만료되었거나 폐기된 토큰은 요청 시 즉시 거부한다.
   `revoked_reason` 필드는 `TokenRevokeReason` enum 값을 문자열로 보관하고, 리프레시 토큰 폐기와 연계해 일괄 업데이트된다.
 - **관계**:
-  - User와 N:1 관계 (cascade delete)
-  - RefreshToken과 N:1 관계 (set null on delete)
+  - User와 N:1 관계
+  - RefreshToken과 N:1 관계 (nullable)
 
 #### 6. AIModel (AI 모델)
 - **테이블명**: `ai_model`
@@ -109,7 +110,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `total_used` (DECIMAL(20,10)): 총 사용 금액
   - `last_transaction_at` (TIMESTAMP): 마지막 거래 시간
   - `created_at`, `updated_at` (TIMESTAMP): 생성/수정 시간
-- **관계**: User와 1:1 관계 (cascade delete)
+- **관계**: User와 1:1 관계
 
 #### 8. PaymentHistory (결제 내역)
 - **테이블명**: `payment_history`
@@ -126,7 +127,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `payment_gateway` (VARCHAR(50)): 결제 게이트웨이
   - `metadata` (JSONB): 메타데이터
   - `created_at`, `completed_at` (TIMESTAMP): 생성/완료 시간
-- **관계**: User와 N:1 관계 (cascade delete)
+- **관계**: User와 N:1 관계
 
 #### 9. CoinTransaction (코인 거래)
 - **테이블명**: `coin_transaction`
@@ -142,18 +143,17 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `model_id` (INT, FK): AI 모델 ID
   - `created_at` (TIMESTAMP): 생성 시간
 - **관계**:
-  - User와 N:1 관계 (cascade delete)
-  - ChatRoom과 N:1 관계 (set null on delete)
-  - Message와 N:1 관계 (set null on delete)
-  - AIModel과 N:1 관계 (set null on delete)
+  - User와 N:1 관계
+  - ChatRoom과 N:1 관계 (nullable)
+  - Message와 N:1 관계 (nullable)
+  - AIModel과 N:1 관계 (nullable)
 
 ### 데이터베이스 설계 특징
 
 - **UUID 사용**: `chat_room`, `message` 엔티티는 UUIDv7을 PK로 사용
 - **Soft Delete**: User 엔티티는 `is_deleted`, `deleted_at` 필드를 통한 소프트 삭제 지원
 - **정밀한 금액 처리**: 코인 관련 필드는 DECIMAL(20,10)로 정밀한 계산 지원
-- **CASCADE 전략**:
-  - User 삭제 시 관련 데이터 자동 삭제 (chat_room, refresh_token, access_token, user_wallet, payment_history, coin_transaction)
-  - ChatRoom 삭제 시 메시지 자동 삭제
-  - 일부 FK는 SET NULL 전략 사용 (coin_transaction의 room_id, message_id, model_id)
+- **연관 관계/삭제 정책**:
+  - User ↔ UserWallet: 1:1 (JPA: `cascade = ALL`, `orphanRemoval = true`)
+  - 그 외 관계는 기본적으로 cascade 설정 없음 (DB의 ON DELETE 동작은 스키마/마이그레이션에 따름)
 - **JSONB 지원**: PaymentHistory의 metadata 필드는 유연한 데이터 저장을 위해 JSONB 타입 사용
