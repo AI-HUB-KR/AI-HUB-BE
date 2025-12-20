@@ -1,22 +1,31 @@
 ## API 응답 구조 표준
+> swagger와 코드를 통해 최신 내용을 확인하는 것을 **강력히 추천** 합니다.
+> 해당 문서는 **참고용** 으로 사용하시는 것을 권장합니다.
 
-모든 API는 일관된 구조의 응답을 반환합니다.
+대부분의 REST API는 일관된 `ApiResponse<T>` 형태로 응답합니다.
+
+단, 아래 케이스는 예외입니다.
+- `204 No Content` 응답: 본문 없음
+- Spring Security의 `AccessDeniedException`(예: 관리자 권한 부족) 응답: `ErrorResponse` 단독 객체로 반환될 수 있음
+- SSE 스트리밍 응답: `text/event-stream` (일반 JSON 래핑 아님)
+
+---
 
 ### 성공 응답 구조
 ```json
 {
   "success": true,
   "detail": {
-    // 실제 응답 데이터
+    "any": "data"
   },
   "timestamp": "2025-01-01T00:00:00Z"
 }
 ```
 
-**설명**:
-- `success`: 요청 성공 여부 (true)
-- `detail`: 실제 응답 데이터 객체
-- `timestamp`: 응답 생성 시각 (ISO 8601 형식)
+**필드**
+- `success`: 성공 여부 (`true`)
+- `detail`: 실제 응답 데이터 (없으면 `null`)
+- `timestamp`: 응답 생성 시각 (`Instant`, ISO 8601)
 
 ### 실패 응답 구조
 ```json
@@ -25,214 +34,203 @@
   "detail": {
     "code": "ERROR_CODE",
     "message": "오류 메시지",
-    "details": "상세 오류 정보 (선택적)"
+    "details": "상세 메시지(선택)"
   },
   "timestamp": "2025-01-01T00:00:00Z"
 }
 ```
 
-**설명**:
-- `success`: 요청 성공 여부 (false)
-- `detail`: 에러 정보 객체 (ErrorResponse)
-  - `code`: 에러 코드 (Enum 이름)
-  - `message`: 사용자에게 표시할 에러 메시지
-  - `details`: 추가 상세 정보 (선택적, null 가능)
-- `timestamp`: 응답 생성 시각 (ISO 8601 형식)
+**필드**
+- `detail.code`: 에러 코드 (주로 `ErrorCode` enum 이름)
+- `detail.message`: 고정 메시지 (`ErrorCode.message`)
+- `detail.details`: 예외 상세 메시지 (선택, `null`이면 JSON에서 생략될 수 있음)
 
-### HTTP Status Code 정의
+---
 
-#### 성공 응답 (2xx)
-- **200 OK**: 요청 성공
-- **201 Created**: 리소스 생성 성공
-- **204 No Content**: 요청 성공, 응답 본문 없음 (삭제 등)
+### HTTP Status Code 매핑 (GlobalExceptionHandler 기준)
 
-#### 클라이언트 오류 (4xx)
-- **400 Bad Request**: 잘못된 요청 (validation 실패)
-- **401 Unauthorized**: 인증 실패 (로그인 필요)
-- **402 Payment Required**: 결제 필요 (코인 잔액 부족 등)
-- **403 Forbidden**: 권한 없음
-- **404 Not Found**: 리소스를 찾을 수 없음
-- **409 Conflict**: 리소스 충돌 (중복 등)
+| HTTP Status | code | 비고 |
+|---|---|---|
+| 200 | - | 성공 |
+| 201 | - | 생성 성공 |
+| 204 | - | 성공, 본문 없음 |
+| 400 | `VALIDATION_ERROR` 등 | 검증/비즈니스 오류 기본값 |
+| 401 | `AUTHENTICATION_FAILED`, `INVALID_TOKEN` | 인증 실패/토큰 문제 |
+| 403 | `FORBIDDEN` | 권한 없음 |
+| 404 | `*_NOT_FOUND` | 리소스 없음 |
+| 409 | `SYSTEM_ILLEGAL_STATE` | 시스템 상태 충돌 |
+| 502 | `AI_SERVER_ERROR` | AI 서버 통신 실패 |
+| 503 | `SERVICE_UNAVAILABLE` | 서비스 이용 불가 |
+| 500 | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
 
-#### 서버 오류 (5xx)
-- **500 Internal Server Error**: 서버 내부 오류
-- **503 Service Unavailable**: 서비스 이용 불가
+---
 
 ### 인증 방식
 
-#### 방식 1: Authorization 헤더 (권장)
-토큰 기반 인증이 필요한 모든 엔드포인트는 아래 형식의 헤더를 포함해야 합니다.
-
+#### 1) Authorization 헤더
 ```http
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-**사용 예시**: 웹 애플리케이션, 모바일 앱, SPA(Single Page Application)
+#### 2) 쿠키 기반 (HttpOnly)
+쿠키 이름은 고정입니다.
+- `accessToken`: Path=`/`
+- `refreshToken`: Path=`/api/v1/token/refresh` (기본값, 환경설정으로 변경 가능)
 
-#### 방식 2: 쿠키 기반 인증 (선택)
-Access Token을 HttpOnly 쿠키로 저장하여 자동 인증을 지원합니다.
+쿠키 속성은 환경설정(`application-*.yaml`)에 따라 달라집니다.
+- `cookie.secure`: dev 기본 `false`, prod 기본 `true`
+- `cookie.same-site`: dev/prod 기본 `Lax`
+- `cookie.domain`: dev 기본 `localhost`, prod `aihub.io.kr`
 
+브라우저에서 쿠키 인증을 쓰려면 요청에 `credentials: "include"`가 필요합니다.
+
+---
+
+### OAuth2 로그인 (카카오)
+
+#### 카카오 소셜 로그인 시작
+- **Method**: GET `/oauth2/authorization/kakao`
+- **설명**: 카카오 로그인 페이지로 리다이렉트합니다.
+- **성공**: `302 Found`
+
+#### 로그인 성공 후 동작
+- 서버가 `accessToken`, `refreshToken` 쿠키를 설정
+- `deployment.frontend.redirect-url`로 리다이렉트
+
+---
+
+### 토큰 갱신/로그아웃
+
+#### 토큰 갱신
+- **Method**: POST `/api/v1/token/refresh`
+- **설명**: `refreshToken` 쿠키로 토큰을 회전 발급하고, 새 쿠키를 응답에 설정합니다.
+- **인증**: Public (단, `refreshToken` 쿠키 필요)
+
+**요청**
 ```http
-Cookie: accessToken=<ACCESS_TOKEN>
-```
-
-**특징**:
-- XSS 공격 방지: HttpOnly 플래그로 JavaScript에서 접근 불가
-- CSRF 공격 방지: SameSite=Strict 설정
-- 자동 전송: 브라우저가 자동으로 쿠키를 요청에 포함
-- 명시적 저장 불필요: 쿠키 자동 관리
-
-**사용 예시**: 전통적인 웹 애플리케이션, 서버 사이드 렌더링
-
-#### Refresh Token 갱신
-리프레시 토큰 갱신 API (`POST /api/v1/auth/token/refresh`)를 호출하면:
-- **요청**: refreshToken 쿠키 자동 전송 (별도 본문 불필요)
-- **응답**: 새로운 Access Token을 HttpOnly 쿠키로 설정
-
-```http
-# 요청
-POST /api/v1/auth/token/refresh
+POST /api/v1/token/refresh
 Cookie: refreshToken=<REFRESH_TOKEN>
-
-# 응답 헤더
-Set-Cookie: accessToken=<NEW_ACCESS_TOKEN>; HttpOnly; Secure; SameSite=Strict
 ```
 
-### 에러 코드 정의
+**성공 응답**
+- **200 OK** (본문은 `detail: null`)
+```json
+{
+  "success": true,
+  "detail": null,
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
 
-**보안 원칙**: 인증 전 API는 일반화된 에러 코드를 사용하여 시스템 내부 정보 노출을 방지합니다.
-
-#### 인증 전 (Public API)
-
-| 코드 | 설명 | 사용 예시 |
-|------|------|----------|
-| `AUTHENTICATION_FAILED` | 인증 실패 (사용자 열거 방지) | 로그인 실패, 토큰 검증 실패 |
-| `VALIDATION_ERROR` | 입력값 검증 오류 (구체적 정보 최소화) | 회원가입 중복 검사, 형식 오류 |
-
-#### 인증 후 (Authenticated API)
-
-| 코드 | 설명 |
-|------|------|
-| `INSUFFICIENT_BALANCE` | 코인 잔액 부족 |
-| `ROOM_NOT_FOUND` | 채팅방을 찾을 수 없음 |
-| `MESSAGE_NOT_FOUND` | 메시지를 찾을 수 없음 |
-| `MODEL_NOT_FOUND` | AI 모델을 찾을 수 없음 |
-| `PAYMENT_FAILED` | 결제 실패 |
-| `PAYMENT_NOT_FOUND` | 결제 내역을 찾을 수 없음 |
-| `WALLET_NOT_FOUND` | 지갑을 찾을 수 없음 |
-| `INVALID_TOKEN` | 유효하지 않은 토큰 |
-| `FORBIDDEN` | 권한 없음 (타 사용자의 리소스 접근 시도) |
-| `TRANSACTION_NOT_FOUND` | 거래 내역을 찾을 수 없음 |
-| `CONFLICT` | 리소스 충돌 (중복, 모순 등) |
-| `TOKEN_REUSED` | 회전된 리프레시 토큰 재사용 감지 |
-| `SYSTEM_ILLEGAL_STATE` | 내부 시스템 상태 불일치 (토큰 해싱 실패 등) |
-
-#### 토큰 폐기 사유 (TokenRevokeReason)
-
-에러 응답의 `details` 필드에 포함될 수 있는 토큰 폐기 사유:
-
-| 사유 | 설명 | 발생 상황 |
-|------|------|----------|
-| `ROTATED` | 토큰 로테이션으로 인한 폐기 | 토큰 갱신 API 호출 시 기존 토큰 폐기 |
-| `EXPIRED` | 토큰 만료로 인한 폐기 | 유효 기간이 지난 토큰 접근 시도 |
-| `USER_LOGOUT` | 사용자 로그아웃으로 인한 폐기 | 로그아웃 API 호출 시 토큰 폐기 |
-
-**사용 예시**:
-- 토큰 갱신 시 동시성 문제로 이미 회전된 토큰 재사용 감지:
-  ```json
-  {
-    "code": "TOKEN_REUSED",
-    "message": "이미 회전된 리프레시 토큰입니다.",
-    "details": "TokenRevokeReason.ROTATED"
-  }
-  ```
-- 로그아웃 후 토큰으로 요청:
-  ```json
-  {
-    "code": "AUTHENTICATION_FAILED",
-    "message": "유효하지 않은 토큰입니다.",
-    "details": "TokenRevokeReason.USER_LOGOUT"
-  }
-  ```
-
-## API 엔드포인트
-
-### 1. 사용자 관리 (User)
-
-#### 내 정보 조회
-- **Method**: GET `/api/v1/users/me`
-- **설명**: 현재 로그인한 사용자 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
+**응답 헤더 예시**
 ```http
+Set-Cookie: accessToken=<NEW_ACCESS_TOKEN>; HttpOnly; Path=/; Max-Age=...
+Set-Cookie: refreshToken=<NEW_REFRESH_TOKEN>; HttpOnly; Path=/api/v1/token/refresh; Max-Age=...
+```
+
+**오류 응답 예시**
+- **401 Unauthorized** (`INVALID_TOKEN`): 리프레시 토큰이 없거나 유효하지 않음
+```json
+{
+  "success": false,
+  "detail": {
+    "code": "INVALID_TOKEN",
+    "message": "유효하지 않은 토큰입니다",
+    "details": "Refresh token cookie is missing"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+#### 로그아웃
+- **Method**: POST `/api/v1/auth/logout`
+- **설명**: 사용자의 Refresh/Access 토큰을 폐기하고 쿠키를 제거합니다.
+- **인증**: 필수 (Access Token)
+
+**요청**
+```http
+POST /api/v1/auth/logout
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
 **성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "userId": 1,
-      "username": "string",
-      "email": "string",
-      "isActivated": true,
-      "createdAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+- **204 No Content**
 
-**응답 필드**
+---
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| success | boolean | 요청 처리 성공 여부 |
-| detail.userId | integer | 사용자 식별자 |
-| detail.username | string | 사용자 이름 |
-| detail.email | string | 사용자 이메일 |
-| detail.isActivated | boolean | 계정 활성화 여부 |
-| detail.createdAt | string | 계정 생성 시각 (ISO 8601) |
-| timestamp | string | 응답 생성 시각 (ISO 8601) |
+### 에러 코드 (ErrorCode)
 
-**오류 응답 예시**
-- **401 Unauthorized**: 유효하지 않은 액세스 토큰
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증 정보가 유효하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 비활성화된 계정
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": "계정이 비활성화되었습니다."
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+#### 인증 전/공통
+| 코드 | 설명 |
+|---|---|
+| `AUTHENTICATION_FAILED` | 인증에 실패했습니다 |
+| `VALIDATION_ERROR` | 입력값 검증에 실패했습니다 |
+| `UNSUPPORTED_OAUTH2_PROVIDER` | 지원하지 않는 OAuth2 공급자입니다 |
+
+#### 인증 후
+| 코드 | 설명 |
+|---|---|
+| `USER_NOT_FOUND` | 사용자를 찾을 수 없습니다 |
+| `FORBIDDEN` | 접근 권한이 없습니다 |
+| `INVALID_TOKEN` | 유효하지 않은 토큰입니다 |
+| `INSUFFICIENT_BALANCE` | 코인 잔액이 부족합니다 |
+| `WALLET_NOT_FOUND` | 지갑을 찾을 수 없습니다 |
+| `ROOM_NOT_FOUND` | 채팅방을 찾을 수 없습니다 |
+| `MESSAGE_NOT_FOUND` | 메시지를 찾을 수 없습니다 |
+| `MODEL_NOT_FOUND` | AI 모델을 찾을 수 없습니다 |
+| `PAYMENT_NOT_FOUND` | 결제 내역을 찾을 수 없습니다 |
+| `PAYMENT_FAILED` | 결제에 실패했습니다 |
+| `TRANSACTION_NOT_FOUND` | 거래 내역을 찾을 수 없습니다 |
+| `SYSTEM_ILLEGAL_STATE` | 시스템 상태가 유효하지 않습니다 |
+| `AI_SERVER_ERROR` | AI 서버와의 통신에 실패했습니다 |
+| `INTERNAL_SERVER_ERROR` | 서버 내부 오류가 발생했습니다 |
+| `SERVICE_UNAVAILABLE` | 서비스를 사용할 수 없습니다 |
+
+#### 기타(안전망)
+아래 코드는 `ErrorCode` enum이 아닌 예외 처리 안전망에서만 사용될 수 있습니다.
+| 코드 | 설명 |
+|---|---|
+| `RESPONSE_STATUS_EXCEPTION` | `ResponseStatusException` 처리 |
+| `UNKNOWN_ERROR` | 알 수 없는 오류(직접 생성 시) |
+
+---
+
+### 토큰 폐기 사유 (TokenRevokeReason)
+| 사유 | 설명 |
+|---|---|
+| `ROTATED` | 토큰 갱신으로 인한 폐기 |
+| `EXPIRED` | 만료로 인한 폐기 |
+| `USER_LOGOUT` | 로그아웃으로 인한 폐기 |
+
+---
+---
+
+## API 엔드포인트
+
+### 1. 사용자 (User)
+
+#### 내 정보 조회
+- **Method**: GET `/api/v1/users/me`
+- **인증**: 필수
+
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": {
+    "userId": 1,
+    "username": "string",
+    "email": "string",
+    "isActivated": true,
+    "createdAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
 
 #### 내 정보 수정
 - **Method**: PUT `/api/v1/users/me`
-- **설명**: 현재 로그인한 사용자의 정보를 수정합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
+- **인증**: 필수
 
 **요청 본문**
 ```json
@@ -242,261 +240,29 @@ Content-Type: application/json
 }
 ```
 
-**요청 필드**
+**요청 제약**
+| 필드 | 제약 |
+|---|---|
+| `username` | 2~30자, 공백 불가 |
+| `email` | 이메일 형식 |
 
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| username | string | ✅ | 사용자 이름 | 2~30자, 공백 불가 |
-| email | string | ✅ | 사용자 이메일 | RFC 5322 형식 |
+**성공 응답 (200)**: `내 정보 조회`와 동일
 
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "userId": 1,
-      "username": "string",
-      "email": "string",
-      "isActivated": true,
-      "createdAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**: `내 정보 조회`와 동일
-
-**오류 응답 예시**
-- **400 Bad Request**: 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "요청 필드가 올바르지 않습니다.",
-      "details": "username은 2자 이상이어야 합니다."
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 이메일 중복
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "이미 사용 중인 이메일입니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+**오류 예시**
+- **400** `VALIDATION_ERROR`: 이메일/사용자명 중복 또는 검증 실패
 
 #### 회원 탈퇴
 - **Method**: DELETE `/api/v1/users/me`
-- **설명**: 회원을 소프트 삭제 처리합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수
+- **성공**: `204 No Content`
 
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
+---
 
-**성공 응답**
-- **204 No Content**: 별도의 본문 없음
-
-**오류 응답 예시**
-- **401 Unauthorized**: 토큰 누락 또는 만료
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 리소스 접근 시도
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-### 2. 인증 (Auth - 카카오 소셜 로그인)
-
-#### 카카오 소셜 로그인 시작
-- **Method**: GET `/oauth2/authorization/kakao`
-- **설명**: 카카오 OAuth2 인증 페이지로 브라우저를 리다이렉트합니다. 최초 로그인 시 자동 회원 가입이 이루어집니다.
-- **인증**: Public
-
-**성공 응답**
-- **302 Found**: 카카오 로그인 페이지로 리다이렉트
-
-**오류 응답 예시**
-- **503 Service Unavailable**: 카카오 OAuth 서버 장애
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "SYSTEM_ILLEGAL_STATE",
-      "message": "소셜 로그인 제공자와 통신할 수 없습니다.",
-      "details": "카카오 OAuth 서버 응답 지연"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**참고**: `/login/oauth2/code/kakao` 콜백은 Spring Security 내부 흐름에서만 사용되며, 클라이언트가 직접 호출할 필요가 없습니다.
-
-#### 토큰 갱신
-- **Method**: POST `/api/v1/token/refresh`
-- **설명**: `refreshToken` 쿠키를 사용해 새로운 액세스 토큰과 리프레시 토큰을 회전 발급합니다.
-- **인증**: 필수 (Refresh Token Cookie)
-
-**요청 헤더**
-```http
-Content-Type: application/json
-Cookie: refreshToken=<REFRESH_TOKEN>
-```
-
-**요청 본문**: 없음 (쿠키 기반 인증)
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": null,
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-  **응답 쿠키** (자동 전송, 클라이언트 처리 불필요):
-  ```http
-  Set-Cookie: accessToken=<NEW_ACCESS_TOKEN>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600
-  Set-Cookie: refreshToken=<NEW_REFRESH_TOKEN>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800
-  ```
-
-**응답 특징**
-
-| 항목 | 설명 |
-|------|------|
-| 응답 본문 | 비어있음 (detail: null) - 토큰은 쿠키로만 전송 |
-| accessToken 쿠키 | 3600초(1시간) 유효, 모든 API 요청 시 자동 전송 |
-| refreshToken 쿠키 | 604800초(7일) 유효, 토큰 갱신 시에만 사용 |
-| HttpOnly 설정 | XSS 공격 방지 - JavaScript에서 접근 불가 |
-| Secure 설정 | HTTPS 연결에서만 전송 |
-| SameSite 설정 | CSRF 공격 방지 |
-
-**오류 응답 예시**
-- **401 Unauthorized**: 만료되었거나 폐기된 리프레시 토큰
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "AUTHENTICATION_FAILED",
-      "message": "리프레시 토큰이 만료되었거나 폐기되었습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 동시에 회전된 토큰 재사용 감지
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "TOKEN_REUSED",
-      "message": "이미 회전된 리프레시 토큰입니다.",
-      "details": "TokenRevokeReason.ROTATED"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**비고**:
-- 서버는 전달된 리프레시 토큰을 SHA-256 해시 후 DB와 대조합니다
-- 검증이 완료된 기존 토큰은 `TokenRevokeReason.ROTATED` 상태로 폐기됩니다
-- 토큰은 응답 본문이 아닌 **쿠키에만 포함**되어 XSS 공격으로부터 안전합니다
-- 클라이언트는 쿠키를 자동으로 관리하므로, 별도의 토큰 저장 로직이 필요 없습니다
-
-#### 로그아웃
-- **Method**: POST `/api/v1/auth/logout`
-- **설명**: 액세스 토큰과 리프레시 토큰을 폐기하고 로그아웃 처리합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**요청 본문**
-```json
-{
-  "refreshToken": "string"
-}
-```
-
-**요청 필드**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| refreshToken | string | ✅ | 폐기할 리프레시 토큰 원문 | 만료되지 않은 토큰 |
-
-**성공 응답**
-- **204 No Content**
-
-**오류 응답 예시**
-- **400 Bad Request**: 요청 본문 누락
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "refreshToken 필드는 필수입니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 액세스 토큰 누락 또는 만료
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**처리**: 검증에 성공하면 관련 액세스 토큰과 리프레시 토큰이 `TokenRevokeReason.USER_LOGOUT` 사유로 폐기됩니다.
-
-### 3. 채팅방 관리 (ChatRoom)
+### 2. 채팅방 (ChatRoom)
 
 #### 채팅방 생성
 - **Method**: POST `/api/v1/chat-rooms`
-- **설명**: 새로운 채팅방을 생성합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
+- **인증**: 필수
 
 **요청 본문**
 ```json
@@ -506,235 +272,76 @@ Content-Type: application/json
 }
 ```
 
-**요청 필드**
+**요청 제약**
+| 필드 | 제약 |
+|---|---|
+| `title` | 공백 불가, 최대 30자 |
+| `modelId` | 필수 |
 
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| title | string | ✅ | 채팅방 제목 | 최대 30자, 공백만 입력 불가 |
-| modelId | integer | ✅ | 사용할 AI 모델 ID | 활성 상태의 모델만 허용 |
+**성공 응답 (201)**
+```json
+{
+  "success": true,
+  "detail": {
+    "roomId": "uuid",
+    "title": "새로운 채팅방",
+    "userId": 1,
+    "coinUsage": 0.0,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
 
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "roomId": "uuid-v7",
-      "title": "새로운 채팅방",
-      "userId": 1,
-      "coinUsage": 0.0,
-      "createdAt": "2025-01-01T00:00:00Z",
-      "updatedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
+**응답 필드 (ChatRoomResponse)**
 | 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.roomId | string | 생성된 채팅방 UUID (v7) |
-| detail.title | string | 채팅방 제목 |
-| detail.userId | integer | 채팅방 소유 사용자 ID |
-| detail.coinUsage | number | 누적 코인 사용량 |
-| detail.createdAt | string | 생성 시각 (ISO 8601) |
-| detail.updatedAt | string | 수정 시각 (ISO 8601) |
+|---|---|---|
+| `detail.roomId` | string | 채팅방 UUID |
+| `detail.title` | string | 채팅방 제목 |
+| `detail.userId` | integer | 채팅방 소유자 ID |
+| `detail.coinUsage` | number | 누적 코인 사용량 |
+| `detail.createdAt` | string | 생성 시각 (ISO 8601) |
+| `detail.updatedAt` | string | 수정 시각 (ISO 8601) |
 
-**오류 응답 예시**
-- **400 Bad Request**: 요청 필드 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "채팅방 제목은 30자 이하여야 합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 모델을 찾을 수 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "지정한 AI 모델이 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+**오류 예시**
+- **404** `MODEL_NOT_FOUND`: 존재하지 않거나 비활성화된 모델
 
 #### 채팅방 목록 조회
 - **Method**: GET `/api/v1/chat-rooms`
-- **설명**: 현재 로그인한 사용자의 채팅방 목록을 페이지네이션하여 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
+- **인증**: 필수
 
 **쿼리 파라미터**
+| 파라미터 | 기본값 | 설명 |
+|---|---:|---|
+| `page` | 0 | 0부터 시작 |
+| `size` | 20 | 페이지 크기 |
+| `sort` | `createdAt,desc` | `필드,asc|desc` |
 
-| 파라미터 | 타입 | 기본값 | 설명 | 제약사항 |
-|---------|------|--------|------|----------|
-| page | integer | 0 | 페이지 번호 | 0 이상 |
-| size | integer | 20 | 페이지 크기 | 1~100 |
-| sort | string | createdAt,desc | 정렬 조건 | `필드,방향` 형식 |
+**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다. (`content`, `totalElements`, `totalPages`, `number`, `size` 외에 `pageable/sort/first/last/empty` 등이 포함될 수 있음)
 
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "content": [
-        {
-          "roomId": "uuid-v7",
-          "title": "채팅방 제목",
-          "coinUsage": 10.5,
-          "lastMessageAt": "2025-01-01T00:00:00Z",
-          "createdAt": "2025-01-01T00:00:00Z"
-        }
-      ],
-      "totalElements": 100,
-      "totalPages": 5,
-      "size": 20,
-      "number": 0
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
+**content[] 필드 (ChatRoomListItemResponse)**
 | 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.content[].roomId | string | 채팅방 UUID |
-| detail.content[].title | string | 채팅방 제목 |
-| detail.content[].coinUsage | number | 누적 코인 사용량 |
-| detail.content[].lastMessageAt | string | 마지막 메시지 시각 |
-| detail.content[].createdAt | string | 채팅방 생성 시각 |
-| detail.totalElements | integer | 전체 채팅방 수 |
-| detail.totalPages | integer | 전체 페이지 수 |
-| detail.size | integer | 페이지 크기 |
-| detail.number | integer | 현재 페이지 번호 |
-
-**오류 응답 예시**
-- **401 Unauthorized**: 인증 정보 누락
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **400 Bad Request**: 잘못된 정렬 파라미터
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "지원하지 않는 정렬 필드입니다.",
-      "details": "sort=unknown,asc"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+|---|---|---|
+| `detail.content[].roomId` | string | 채팅방 UUID |
+| `detail.content[].title` | string | 채팅방 제목 |
+| `detail.content[].coinUsage` | number | 누적 코인 사용량 |
+| `detail.content[].lastMessageAt` | string | 마지막 메시지 시각 (없으면 `null`) |
+| `detail.content[].createdAt` | string | 생성 시각 (ISO 8601) |
 
 #### 채팅방 상세 조회
 - **Method**: GET `/api/v1/chat-rooms/{roomId}`
-- **설명**: 특정 채팅방에 대한 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
+- **인증**: 필수
 
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
+**성공 응답 (200)**: `채팅방 생성`의 `ChatRoomResponse`와 동일
 
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 조회할 채팅방 UUID |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "roomId": "uuid-v7",
-      "title": "채팅방 제목",
-      "userId": 1,
-      "coinUsage": 10.5,
-      "createdAt": "2025-01-01T00:00:00Z",
-      "updatedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.roomId | string | 채팅방 UUID |
-| detail.title | string | 채팅방 제목 |
-| detail.userId | integer | 채팅방 소유자 ID |
-| detail.coinUsage | number | 누적 코인 사용량 |
-| detail.createdAt | string | 생성 시각 |
-| detail.updatedAt | string | 수정 시각 |
-
-**오류 응답 예시**
-- **404 Not Found**: 채팅방 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "ROOM_NOT_FOUND",
-      "message": "채팅방이 존재하지 않습니다.",
-      "details": "roomId=92c3..."
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 채팅방 접근 시도
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+**오류 예시**
+- **404** `ROOM_NOT_FOUND`
+- **403** `FORBIDDEN`
 
 #### 채팅방 제목 수정
 - **Method**: PUT `/api/v1/chat-rooms/{roomId}`
-- **설명**: 채팅방 제목을 수정합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 수정할 채팅방 UUID |
+- **인증**: 필수
 
 **요청 본문**
 ```json
@@ -743,2109 +350,654 @@ Content-Type: application/json
 }
 ```
 
-**요청 필드**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| title | string | ✅ | 새로운 채팅방 제목 | 최대 30자 |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "roomId": "uuid-v7",
-      "title": "수정된 채팅방 제목",
-      "userId": 1,
-      "coinUsage": 10.5,
-      "createdAt": "2025-01-01T00:00:00Z",
-      "updatedAt": "2025-01-02T00:00:00Z"
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.roomId | string | 채팅방 UUID |
-| detail.title | string | 채팅방 제목 |
-| detail.userId | integer | 채팅방 소유자 ID |
-| detail.coinUsage | number | 누적 코인 사용량 |
-| detail.createdAt | string | 생성 시각 |
-| detail.updatedAt | string | 수정 시각 |
-
-**오류 응답 예시**
-- **400 Bad Request**: 제목 길이 초과
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "채팅방 제목은 30자 이하여야 합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 채팅방 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "ROOM_NOT_FOUND",
-      "message": "채팅방이 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
+**성공 응답 (200)**: `채팅방 생성`의 `ChatRoomResponse`와 동일
 
 #### 채팅방 삭제
 - **Method**: DELETE `/api/v1/chat-rooms/{roomId}`
-- **설명**: 채팅방을 삭제하며 연관 메시지도 함께 삭제합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 삭제할 채팅방 UUID |
-
-**성공 응답**
-- **204 No Content**
-
-**오류 응답 예시**
-- **404 Not Found**: 존재하지 않는 채팅방
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "ROOM_NOT_FOUND",
-      "message": "채팅방이 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 채팅방 삭제 시도
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
-
-### 4. 파일 업로드 (File Upload)
-
-#### 파일 업로드
-- **Method**: POST `/api/v1/messages/files/upload`
-- **설명**: 사용자가 업로드한 파일을 AI 서버에 업로드하고 파일 ID를 반환합니다.
-- **인증**: 필수 (Bearer Token)
-- **파일 용량 제한**: 최대 10MB
-- **확장자명 제한**: 이미지만 지원 (.jpg, .jpeg, .png, .webp)
-- **검증**: 확장자, MIME Type, Magic Number (파일 헤더) 종합 검증
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: multipart/form-data
-```
-
-**요청 본문 (multipart/form-data)**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| file | file | ✅ | 업로드할 파일 | 최대 10MB, 이미지만 허용 |
-| modelId | integer | ✅ | AI 모델 ID | 유효한 모델 ID 필요 |
-
-**cURL 예제**
-```bash
-curl -X POST http://localhost:8080/api/v1/messages/files/upload \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -F "file=@/path/to/your/image.png" \
-  -F "modelId=1"
-```
-
-**JavaScript/Fetch 예제**
-```javascript
-const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-formData.append('modelId', 1);
-
-const response = await fetch('/api/v1/messages/files/upload', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  },
-  body: formData
-});
-
-const data = await response.json();
-console.log(data.detail.fileId); // "file-UkbZS1SH6KcYZkZqqemVdU"
-```
-
-**지원 파일 타입**
-- **이미지**: `.jpg`, `.jpeg`, `.png`, `.webp` (최대 10MB)
-
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "fileId": "file-UkbZS1SH6KcYZkZqqemVdU"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| success | boolean | 요청 성공 여부 |
-| detail.fileId | string | AI 서버에서 반환된 파일 ID (메시지 전송 시 사용) |
-| timestamp | string | 응답 생성 시간 (ISO 8601) |
-
-**오류 응답 예시**
-
-- **400 Bad Request**: 파일 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "지원하지 않는 파일 형식입니다: exe. 지원되는 형식: jpg, jpeg, png, webp",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-- **400 Bad Request**: 파일 크기 초과
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "파일 크기가 너무 큽니다. 최대 크기: 10MB",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-- **400 Bad Request**: Magic Number 검증 실패 (파일 형식 위조 감지)
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "파일 형식이 일치하지 않습니다. 감지된 타입: application/octet-stream",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-- **404 Not Found**: AI 모델을 찾을 수 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "AI 모델을 찾을 수 없습니다: 999",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-- **5xx Server Error**: AI 서버 파일 업로드 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "AI_SERVER_ERROR",
-      "message": "파일 업로드 중 에러가 발생했습니다: Connection timeout",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **503 Service Unavailable**: R2 업로드 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "SYSTEM_ILLEGAL_STATE",
-      "message": "파일 업로드 중 오류가 발생했습니다.",
-      "details": "R2 서비스 일시적 오류"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**사용 흐름**
-1. **파일 업로드**: `POST /api/v1/files/upload`로 파일을 multipart 형식으로 업로드
-2. **URL 획득**: 응답의 `detail.fileUrl`에서 R2 URL 획득
-3. **메시지 전송**: 메시지 전송 API에서 `fileUrl` 필드에 획득한 URL을 사용
-
-
+- **인증**: 필수
+- **성공**: `204 No Content`
 
 ---
 
-### 5. 메시지 (Message)
-
-#### 메시지 전송 및 AI 응답
-- **Method**: SSE `/api/v1/chat-rooms/{roomId}/messages`
-- **설명**: 사용자가 메시지를 전송하면 AI 모델 응답과 코인 차감 결과를 반환합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 메시지를 전송할 채팅방 UUID |
-
-**요청 본문**
-```json
-{
-  "content": "안녕하세요, AI!",
-  "fileUrl": "https://example.com/file.png",
-  "modelId": 1
-}
-```
-
-**요청 필드**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| content | string | ✅ | 사용자 메시지 내용 | 최대 4,000자 |
-| fileUrl | string | ❌ | 첨부 파일 URL | HTTPS만 허용 |
-| modelId | integer | ✅ | 사용할 AI 모델 ID | 채팅방에 허용된 모델 |
-
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "userMessage": {
-        "messageId": "uuid-v7",
-        "roomId": "uuid-v7",
-        "role": "user",
-        "content": "안녕하세요, AI!",
-        "fileUrl": "https://example.com/file.png",
-        "tokenCount": 5.0,
-        "coinCount": 0.0001,
-        "modelId": 1,
-        "createdAt": "2025-01-01T00:00:00Z"
-      },
-      "assistantMessage": {
-        "messageId": "uuid-v7",
-        "roomId": "uuid-v7",
-        "role": "assistant",
-        "content": "안녕하세요! 무엇을 도와드릴까요?",
-        "tokenCount": 10.0,
-        "coinCount": 0.0002,
-        "modelId": 1,
-        "createdAt": "2025-01-01T00:00:01Z"
-      },
-      "totalCoinUsed": 0.0003,
-      "remainingBalance": 99.9997
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.userMessage | object | 사용자가 전송한 메시지 정보 |
-| detail.userMessage.messageId | string | 메시지 UUID |
-| detail.userMessage.roomId | string | 채팅방 UUID |
-| detail.userMessage.role | string | 메시지 역할 (user) |
-| detail.userMessage.content | string | 메시지 내용 |
-| detail.userMessage.fileUrl | string | 첨부 파일 URL (선택적, null 가능) |
-| detail.userMessage.tokenCount | number | 사용된 토큰 수 |
-| detail.userMessage.coinCount | number | 차감된 코인 수 |
-| detail.userMessage.modelId | integer | 사용 모델 ID |
-| detail.userMessage.createdAt | string | 메시지 생성 시각 |
-| detail.assistantMessage | object | AI 응답 메시지 정보 |
-| detail.assistantMessage.messageId | string | 메시지 UUID |
-| detail.assistantMessage.roomId | string | 채팅방 UUID |
-| detail.assistantMessage.role | string | 메시지 역할 (assistant) |
-| detail.assistantMessage.content | string | AI 응답 내용 |
-| detail.assistantMessage.fileUrl | string | AI 생성 파일 URL (선택적, null 가능) |
-| detail.assistantMessage.tokenCount | number | 사용된 토큰 수 |
-| detail.assistantMessage.coinCount | number | 차감된 코인 수 |
-| detail.assistantMessage.modelId | integer | 사용 모델 ID |
-| detail.assistantMessage.createdAt | string | 메시지 생성 시각 |
-| detail.totalCoinUsed | number | 요청 처리 중 사용된 총 코인 |
-| detail.remainingBalance | number | 처리 후 남은 코인 잔액 |
-
-**오류 응답 예시**
-- **400 Bad Request**: 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "content는 비어 있을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **402 Payment Required**: 코인 잔액 부족
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INSUFFICIENT_BALANCE",
-      "message": "코인 잔액이 부족합니다.",
-      "details": "requiredCoin=0.5"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 채팅방 또는 모델 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "ROOM_NOT_FOUND",
-      "message": "채팅방이 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 메시지 목록 조회
-- **Method**: GET `/api/v1/messages/page/{roomId}`
-- **설명**: 특정 채팅방의 메시지를 페이지네이션하여 조회합니다.
-- **인증**: 필수 (Bearer Token 또는 쿠키)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 메시지를 조회할 채팅방 UUID |
-
-**쿼리 파라미터**
-
-| 파라미터 | 타입 | 기본값 | 설명 | 제약사항 |
-|---------|------|--------|------|----------|
-| page | integer | 0 | 페이지 번호 | 0 이상 |
-| size | integer | 50 | 페이지 크기 | 1~200 |
-| sort | string | createdAt,asc | 정렬 조건 | `필드,방향` |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "content": [
-        {
-          "messageId": "uuid-v7",
-          "role": "user",
-          "content": "메시지 내용",
-          "tokenCount": 5.0,
-          "coinCount": 0.0001,
-          "modelId": 1,
-          "createdAt": "2025-01-01T00:00:00Z"
-        }
-      ],
-      "totalElements": 100,
-      "totalPages": 2,
-      "size": 50,
-      "number": 0
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.content[] | array | 메시지 배열 |
-| detail.content[].messageId | string | 메시지 UUID |
-| detail.content[].role | string | 메시지 역할 (user, assistant) |
-| detail.content[].content | string | 메시지 내용 |
-| detail.content[].tokenCount | number | 사용된 토큰 수 |
-| detail.content[].coinCount | number | 차감된 코인 수 |
-| detail.content[].modelId | integer | 사용 모델 ID |
-| detail.content[].createdAt | string | 메시지 생성 시각 |
-| detail.totalElements | integer | 전체 메시지 수 |
-| detail.totalPages | integer | 전체 페이지 수 |
-| detail.size | integer | 페이지 크기 |
-| detail.number | integer | 현재 페이지 번호 |
-
-**오류 응답 예시**
-- **404 Not Found**: 채팅방 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "ROOM_NOT_FOUND",
-      "message": "채팅방이 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 채팅방
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 메시지 상세 조회
-- **Method**: GET `/api/v1/messages/{messageId}`
-- **설명**: 특정 메시지의 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token 또는 쿠키)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| messageId | string | 조회할 메시지 UUID |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "messageId": "uuid-v7",
-      "roomId": "uuid-v7",
-      "role": "user",
-      "content": "메시지 내용",
-      "fileUrl": "https://example.com/file.png",
-      "tokenCount": 5.0,
-      "coinCount": 0.0001,
-      "modelId": 1,
-      "createdAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.messageId | string | 메시지 UUID |
-| detail.roomId | string | 메시지가 속한 채팅방 UUID |
-| detail.role | string | 메시지 역할 (user, assistant) |
-| detail.content | string | 메시지 내용 |
-| detail.fileUrl | string | 첨부 파일 URL (선택적, null 가능) |
-| detail.tokenCount | number | 사용된 토큰 수 |
-| detail.coinCount | number | 차감된 코인 수 |
-| detail.modelId | integer | 사용 모델 ID |
-| detail.createdAt | string | 메시지 생성 시각 |
-
-**오류 응답 예시**
-- **404 Not Found**: 메시지를 찾을 수 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MESSAGE_NOT_FOUND",
-      "message": "메시지를 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 메시지 접근
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+### 3. 메시지 (Message)
 
 #### 파일 업로드
 - **Method**: POST `/api/v1/messages/files/upload`
-- **설명**: AI 서버에 파일을 업로드하고 file ID를 반환받습니다.
-- **인증**: 필수 (Bearer Token 또는 쿠키)
+- **인증**: 필수
+- **Consumes**: `multipart/form-data`
 
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: multipart/form-data
-```
+**요청 (multipart/form-data)**
+| 필드 | 위치 | 필수 | 설명 |
+|---|---|---:|---|
+| `file` | part | ✅ | 이미지 파일 (`jpg/jpeg/png/webp`, 최대 10MB) |
+| `modelId` | param | ✅ | AI 모델 ID |
 
-**요청 바디 (Multipart Form Data)**
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| file | File | Y | 업로드할 파일 (jpg, jpeg, png, webp, 최대 10MB) |
-| modelId | integer | Y | AI 모델 ID |
-
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "fileId": "file-abc123xyz"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.fileId | string | AI 서버가 발급한 파일 ID (메시지 전송 시 사용) |
-
-**오류 응답 예시**
-- **400 Bad Request**: 파일 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "파일 크기가 너무 큽니다. 최대 크기: 10MB",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 모델 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "AI 모델을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **502 Bad Gateway**: AI 서버 통신 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "AI_SERVER_ERROR",
-      "message": "AI 서버와의 통신에 실패했습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 메시지 전송 (SSE 스트리밍)
-- **Method**: POST `/api/v1/messages/send/{roomId}`
-- **설명**: 채팅방에 메시지를 전송하고 AI 응답을 SSE(Server-Sent Events)로 실시간 스트리밍합니다.
-- **인증**: 필수 (Bearer Token 또는 쿠키)
-- **응답 형식**: text/event-stream
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| roomId | string | 메시지를 전송할 채팅방 UUID |
-
-**요청 바디**
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| message | string | Y | 전송할 메시지 내용 (공백 제외 1자 이상) |
-| modelId | integer | Y | 사용할 AI 모델 ID |
-| fileId | string | N | 첨부 파일 ID (파일 업로드 API로 받은 ID) |
-| previousResponseId | string | N | 이전 대화 응답 ID (대화 맥락 연결용) |
-
-**요청 예시**
+**성공 응답 (201)**
 ```json
 {
-  "message": "안녕하세요, GPT-4!",
-  "modelId": 1,
-  "fileId": "file-abc123xyz",
-  "previousResponseId": "resp-xyz789"
-}
-```
-
-**SSE 이벤트 스트림**
-
-1. **started** 이벤트 (연결 확인)
-   ```
-   event: started
-   data: Message sending started
-   ```
-
-2. **delta** 이벤트 (응답 텍스트 조각, 여러 번 전송됨)
-   ```
-   event: delta
-   data: 안녕하세요!
-
-   event: delta
-   data:  반갑습니다.
-   ```
-
-3. **completed** 이벤트 (응답 완료)
-   ```
-   event: completed
-   data: {"userMessageId":"uuid-v7","aiResponseId":"resp-123","inputTokens":10,"outputTokens":20}
-   ```
-
-**SSE completed 이벤트 데이터 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| userMessageId | string | 저장된 사용자 메시지 UUID |
-| aiResponseId | string | AI 서버 응답 ID (다음 대화 연결용) |
-| inputTokens | integer | 입력 토큰 수 |
-| outputTokens | integer | 출력 토큰 수 |
-
-**비즈니스 로직**
-- User 메시지를 먼저 DB에 저장 (별도 트랜잭션)
-- AI 서버에서 응답을 SSE 스트리밍으로 수신하며 클라이언트에 전달
-- 응답 완료 후:
-  - 토큰 수 기반 코인 계산: `(tokens / 1,000,000) * price_per_1M`
-  - 사용자 지갑에서 코인 차감
-  - Assistant 메시지 DB에 저장
-  - User 메시지에 responseId, 토큰, 코인 정보 업데이트
-  - ChatRoom의 coinUsage 업데이트
-  - CoinTransaction 기록 생성
-
-**오류 응답**
-- SSE 연결은 오류 발생 시 종료됩니다
-- **404 Not Found**: 채팅방 또는 모델 없음
-- **403 Forbidden**: 채팅방 접근 권한 없음
-- **400 Bad Request**: 잔액 부족 또는 검증 실패
-- **502 Bad Gateway**: AI 서버 통신 실패
-
-**오류 예시 (일반 JSON 응답)**
-```json
-{
-  "success": false,
+  "success": true,
   "detail": {
-    "code": "INSUFFICIENT_BALANCE",
-    "message": "코인 잔액이 부족합니다.",
-    "details": null
+    "fileId": "file-abc123"
   },
   "timestamp": "2025-01-01T00:00:00Z"
 }
 ```
 
-**사용 예시 (JavaScript)**
-```javascript
-const eventSource = new EventSource('/api/v1/messages/send/room-uuid', {
-  headers: {
-    'Authorization': 'Bearer ' + token
+**응답 필드 (FileUploadResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.fileId` | string | AI 서버가 발급한 파일 ID |
+
+**오류 예시**
+- **400** `VALIDATION_ERROR`: 파일 검증 실패
+- **404** `MODEL_NOT_FOUND`
+- **502** `AI_SERVER_ERROR`: AI 서버 업로드 실패
+
+#### 메시지 목록 조회
+- **Method**: GET `/api/v1/messages/page/{roomId}`
+- **인증**: 필수
+
+**쿼리 파라미터**
+| 파라미터 | 기본값 | 설명 |
+|---|---:|---|
+| `page` | 0 | 0부터 시작 |
+| `size` | 50 | 페이지 크기 |
+| `sort` | `createdAt,asc` | `필드,asc|desc` |
+
+**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다.
+
+**content[] 필드 (MessageListItemResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.content[].messageId` | string | 메시지 UUID |
+| `detail.content[].role` | string | 역할 (`user`, `assistant`) |
+| `detail.content[].content` | string | 메시지 내용 |
+| `detail.content[].tokenCount` | number | 토큰 수 |
+| `detail.content[].coinCount` | number | 코인 수 |
+| `detail.content[].modelId` | integer | 모델 ID (없을 수 있음) |
+| `detail.content[].createdAt` | string | 생성 시각 (ISO 8601) |
+
+**오류 예시**
+- **404** `ROOM_NOT_FOUND`
+- **403** `FORBIDDEN`
+
+#### 메시지 상세 조회
+- **Method**: GET `/api/v1/messages/{messageId}`
+- **인증**: 필수
+
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": {
+    "messageId": "uuid",
+    "roomId": "uuid",
+    "role": "assistant",
+    "content": "string",
+    "fileUrl": null,
+    "tokenCount": 123.0,
+    "coinCount": 0.000123,
+    "modelId": 1,
+    "createdAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (MessageResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.messageId` | string | 메시지 UUID |
+| `detail.roomId` | string | 채팅방 UUID |
+| `detail.role` | string | 역할 (`user`, `assistant`) |
+| `detail.content` | string | 메시지 내용 |
+| `detail.fileUrl` | string | 첨부 파일 URL (없으면 `null`) |
+| `detail.tokenCount` | number | 토큰 수 |
+| `detail.coinCount` | number | 코인 수 |
+| `detail.modelId` | integer | 모델 ID (없을 수 있음) |
+| `detail.createdAt` | string | 생성 시각 (ISO 8601) |
+
+**오류 예시**
+- **404** `MESSAGE_NOT_FOUND`
+- **403** `FORBIDDEN`
+
+#### 메시지 전송 (SSE 스트리밍)
+- **Method**: POST `/api/v1/messages/send/{roomId}`
+- **인증**: 필수
+- **Produces**: `text/event-stream`
+
+**요청 본문**
+```json
+{
+  "message": "안녕하세요!",
+  "modelId": 1,
+  "files": [
+    {
+      "id": "file-abc123",
+      "type": "image"
+    }
+  ]
+}
+```
+
+**요청 필드**
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---:|---|
+| `message` | string | ✅ | 메시지 내용 |
+| `modelId` | integer | ✅ | AI 모델 ID |
+| `files` | array | ❌ | 첨부 파일 목록 |
+| `files[].id` | string | ✅ | 업로드된 파일 ID |
+| `files[].type` | string | ✅ | `image \| document \| audio` |
+
+**SSE 이벤트**
+1) `started` 이벤트 (문자열)
+```
+event: started
+data: Message sending started
+```
+
+2) `response` 이벤트 (반복)
+```json
+{"type":"response","data":"텍스트 조각"}
+```
+
+3) `usage` 이벤트 (최종)
+```json
+{
+  "type": "usage",
+  "aiResponseId": "resp_abc123",
+  "fullContent": "전체 응답 문자열",
+  "usage": {
+    "input_tokens": 10,
+    "output_tokens": 20,
+    "total_tokens": 30
   }
-});
+}
+```
 
-eventSource.addEventListener('started', (e) => {
-  console.log('Connection started:', e.data);
-});
+**클라이언트 참고**
+- 브라우저 기본 `EventSource`는 **POST/요청 본문/커스텀 헤더를 지원하지 않으므로** 이 엔드포인트에 직접 사용하기 어렵습니다.
+- `fetch`로 스트림을 읽어 SSE를 파싱하거나, POST를 지원하는 SSE 클라이언트(예: `@microsoft/fetch-event-source`)를 사용하세요.
 
-eventSource.addEventListener('delta', (e) => {
-  console.log('Response chunk:', e.data);
-  // UI에 텍스트 추가
-});
+**사용 예시 (TypeScript, fetch-event-source)**
+```ts
+import { fetchEventSource } from "@microsoft/fetch-event-source";
 
-eventSource.addEventListener('completed', (e) => {
-  const data = JSON.parse(e.data);
-  console.log('Response completed:', data);
-  eventSource.close();
-});
-
-eventSource.addEventListener('error', (e) => {
-  console.error('SSE error:', e);
-  eventSource.close();
+await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+  body: JSON.stringify({ message, modelId, files }),
+  onmessage(ev) {
+    if (ev.event === "response") {
+      const { data } = JSON.parse(ev.data) as { type: "response"; data: string };
+      // data(텍스트 조각) 처리
+    }
+    if (ev.event === "usage") {
+      const result = JSON.parse(ev.data);
+      // 최종 결과 처리 (aiResponseId, fullContent, usage 등)
+    }
+  },
 });
 ```
 
-### 5. AI 모델 (AIModel)
+**오류**
+- 스트리밍 시작 전 검증 단계에서 실패하면 일반 JSON(`ApiResponse<ErrorResponse>`)으로 반환될 수 있습니다.
+- 스트리밍 중 오류는 연결 종료로 표현될 수 있습니다.
 
-#### AI 모델 목록 조회
+---
+
+### 4. AI 모델 (AIModel)
+
+#### 활성화된 AI 모델 목록 조회
 - **Method**: GET `/api/v1/models`
-- **설명**: 활성화된 AI 모델 목록을 조회합니다.
-- **인증**: Public
+- **인증**: 필수
 
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": [
-      {
-        "modelId": 1,
-        "modelName": "gpt-4",
-        "displayName": "GPT-4",
-        "displayExplain": "OpenAI의 최신 대화형 AI 모델",
-        "inputPricePer1m": 0.03,
-        "outputPricePer1m": 0.06,
-        "isActive": true,
-        "createdAt": "2025-01-01T00:00:00Z",
-        "updatedAt": "2025-01-01T00:00:00Z"
-      }
-    ],
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail[].modelId | integer | 모델 ID |
-| detail[].modelName | string | 내부 모델 식별자 |
-| detail[].displayName | string | 사용자 표시 이름 |
-| detail[].displayExplain | string | 모델 설명 |
-| detail[].inputPricePer1m | number | 입력 1m 토큰당 가격 |
-| detail[].outputPricePer1m | number | 출력 1m 토큰당 가격 |
-| detail[].isActive | boolean | 활성화 여부 |
-| detail[].createdAt | string | 생성 시각 (ISO 8601) |
-| detail[].updatedAt | string | 수정 시각 (ISO 8601) |
-
-**오류 응답 예시**
-- **503 Service Unavailable**: 가격 데이터 동기화 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "SYSTEM_ILLEGAL_STATE",
-      "message": "모델 가격 정보를 가져오지 못했습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### AI 모델 상세 조회
-- **Method**: GET `/api/v1/models/{modelId}`
-- **설명**: 특정 AI 모델의 상세 정보를 조회합니다.
-- **인증**: Public
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| modelId | integer | 조회할 모델 ID |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": [
+    {
       "modelId": 1,
       "modelName": "gpt-4",
       "displayName": "GPT-4",
-      "displayExplain": "OpenAI의 최신 대화형 AI 모델",
+      "displayExplain": "설명",
       "inputPricePer1m": 0.03,
       "outputPricePer1m": 0.06,
       "isActive": true,
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+    }
+  ],
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
 
-**응답 필드**
-
+**응답 필드 (AIModelResponse)**
 | 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.modelId | integer | 모델 ID |
-| detail.modelName | string | 내부 모델 식별자 |
-| detail.displayName | string | 사용자 표시 이름 |
-| detail.displayExplain | string | 모델 설명 |
-| detail.inputPricePer1m | number | 입력 1m 토큰당 가격 |
-| detail.outputPricePer1m | number | 출력 1m 토큰당 가격 |
-| detail.isActive | boolean | 활성화 여부 |
-| detail.createdAt | string | 생성 시각 (ISO 8601) |
-| detail.updatedAt | string | 수정 시각 (ISO 8601) |
+|---|---|---|
+| `detail[].modelId` | integer | 모델 ID |
+| `detail[].modelName` | string | 내부 모델 식별자 |
+| `detail[].displayName` | string | 표시 이름 |
+| `detail[].displayExplain` | string | 설명 |
+| `detail[].inputPricePer1m` | number | 입력 1M 토큰당 가격 |
+| `detail[].outputPricePer1m` | number | 출력 1M 토큰당 가격 |
+| `detail[].isActive` | boolean | 활성화 여부 |
+| `detail[].createdAt` | string | 생성 시각 (ISO 8601) |
+| `detail[].updatedAt` | string | 수정 시각 (ISO 8601) |
 
-**오류 응답 예시**
-- **404 Not Found**: 모델 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "요청한 모델을 찾을 수 없습니다.",
-      "details": null
+---
+
+### 5. 지갑 (UserWallet)
+
+#### 지갑 상세 조회
+- **Method**: GET `/api/v1/wallet`
+- **인증**: 필수
+
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": {
+    "walletId": 1,
+    "userId": 1,
+    "balance": 100.5,
+    "totalPurchased": 200.0,
+    "totalUsed": 99.5,
+    "lastTransactionAt": "2025-01-01T00:00:00Z",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (UserWalletResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.walletId` | integer | 지갑 ID |
+| `detail.userId` | integer | 사용자 ID |
+| `detail.balance` | number | 현재 잔액 |
+| `detail.totalPurchased` | number | 누적 구매(충전) |
+| `detail.totalUsed` | number | 누적 사용 |
+| `detail.lastTransactionAt` | string | 마지막 거래 시각 (없으면 `null`) |
+| `detail.createdAt` | string | 생성 시각 (ISO 8601) |
+| `detail.updatedAt` | string | 수정 시각 (ISO 8601) |
+
+**오류 예시**
+- **404** `WALLET_NOT_FOUND`
+
+#### 코인 잔액 조회
+- **Method**: GET `/api/v1/wallet/balance`
+- **인증**: 필수
+
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": {
+    "balance": 100.5
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (BalanceResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.balance` | number | 현재 잔액 |
+
+**오류 예시**
+- **404** `WALLET_NOT_FOUND`
+
+---
+
+### 6. 결제 내역 (PaymentHistory)
+
+#### 결제 내역 목록 조회
+- **Method**: GET `/api/v1/payments`
+- **인증**: 필수
+
+**쿼리 파라미터**
+| 파라미터 | 기본값 | 설명 |
+|---|---:|---|
+| `status` | - | 상태 필터(문자열) |
+| `page` | 0 | 0부터 시작 |
+| `size` | 20 | 페이지 크기 |
+
+**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다. 각 `content[]` 항목은 `PaymentResponse`입니다.
+
+**content[] 필드 (PaymentResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.content[].paymentId` | integer | 결제 ID |
+| `detail.content[].transactionId` | string | 트랜잭션 ID |
+| `detail.content[].paymentMethod` | string | 결제 수단 |
+| `detail.content[].amountKrw` | number | 결제 금액(KRW) |
+| `detail.content[].amountUsd` | number | 환산 금액(USD) |
+| `detail.content[].coinAmount` | number | 지급 코인 |
+| `detail.content[].bonusCoin` | number | 보너스 코인 |
+| `detail.content[].status` | string | 결제 상태(문자열) |
+| `detail.content[].paymentGateway` | string | 결제 게이트웨이 |
+| `detail.content[].metadata` | object | 부가 메타데이터 |
+| `detail.content[].createdAt` | string | 생성 시각 (ISO 8601) |
+| `detail.content[].completedAt` | string | 완료 시각 (없으면 `null`) |
+
+#### 결제 상세 조회
+- **Method**: GET `/api/v1/payments/{paymentId}`
+- **인증**: 필수
+
+**성공 응답 (200)** (`PaymentResponse`)
+```json
+{
+  "success": true,
+  "detail": {
+    "paymentId": 1,
+    "transactionId": "tx_123",
+    "paymentMethod": "card",
+    "amountKrw": 10000.0,
+    "amountUsd": 7.5,
+    "coinAmount": 7.5,
+    "bonusCoin": 0.5,
+    "status": "completed",
+    "paymentGateway": "toss",
+    "metadata": {},
+    "createdAt": "2025-01-01T00:00:00Z",
+    "completedAt": "2025-01-01T00:01:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**오류 예시**
+- **404** `PAYMENT_NOT_FOUND`
+- **403** `FORBIDDEN`
+
+---
+
+### 7. 코인 거래 내역 (CoinTransaction)
+
+#### 코인 거래 내역 조회
+- **Method**: GET `/api/v1/transactions`
+- **인증**: 필수
+
+**쿼리 파라미터**
+| 파라미터 | 기본값 | 설명 |
+|---|---:|---|
+| `transactionType` | - | 거래 유형(문자열) |
+| `startDate` | - | `YYYY-MM-DD` |
+| `endDate` | - | `YYYY-MM-DD` |
+| `page` | 0 | 0부터 시작 |
+| `size` | 20 | 페이지 크기 |
+
+**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다. 각 `content[]` 항목은 `CoinTransactionResponse`입니다.
+
+**content[] 필드 (CoinTransactionResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.content[].transactionId` | integer | 거래 ID |
+| `detail.content[].transactionType` | string | 거래 유형(문자열) |
+| `detail.content[].amount` | number | 증감액(코인) |
+| `detail.content[].balanceAfter` | number | 거래 후 잔액 |
+| `detail.content[].description` | string | 설명 |
+| `detail.content[].modelId` | integer | 모델 ID (없을 수 있음) |
+| `detail.content[].modelName` | string | 모델 이름 (없을 수 있음) |
+| `detail.content[].roomId` | string | 채팅방 UUID (없을 수 있음) |
+| `detail.content[].messageId` | string | 메시지 UUID (없을 수 있음) |
+| `detail.content[].createdAt` | string | 생성 시각 (ISO 8601) |
+
+---
+
+### 8. 대시보드 (Dashboard)
+
+#### 모델 가격 조회
+- **Method**: GET `/api/v1/dashboard/models/pricing`
+- **인증**: 필수
+
+**성공 응답 (200)** (`ModelPricingResponse[]`)
+```json
+{
+  "success": true,
+  "detail": [
+    {
+      "modelId": 1,
+      "modelName": "gpt-4",
+      "displayName": "GPT-4",
+      "inputPricePer1m": 0.03,
+      "outputPricePer1m": 0.06,
+      "isActive": true
+    }
+  ],
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (ModelPricingResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail[].modelId` | integer | 모델 ID |
+| `detail[].modelName` | string | 내부 모델 식별자 |
+| `detail[].displayName` | string | 표시 이름 |
+| `detail[].inputPricePer1m` | number | 입력 1M 토큰당 가격 |
+| `detail[].outputPricePer1m` | number | 출력 1M 토큰당 가격 |
+| `detail[].isActive` | boolean | 활성화 여부 |
+
+#### 월별 사용량 조회
+- **Method**: GET `/api/v1/dashboard/usage/monthly`
+- **인증**: 필수
+
+**쿼리 파라미터**
+| 파라미터 | 기본값 | 설명 |
+|---|---|---|
+| `year` | 현재 연도 | 조회할 연도 |
+| `month` | 현재 월 | 1~12 |
+
+**성공 응답 (200)** (`MonthlyUsageResponse`)
+```json
+{
+  "success": true,
+  "detail": {
+    "year": 2025,
+    "month": 1,
+    "totalCoinUsed": 50.5,
+    "modelUsage": [
+      {
+        "modelId": 1,
+        "modelName": "gpt-4",
+        "displayName": "GPT-4",
+        "coinUsed": 30.0,
+        "messageCount": 150,
+        "tokenCount": 50000.0,
+        "percentage": 59.4
+      }
+    ],
+    "dailyUsage": [
+      {
+        "date": "2025-01-01",
+        "coinUsed": 2.5,
+        "messageCount": 10
+      }
+    ]
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (MonthlyUsageResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.year` | integer | 연도 |
+| `detail.month` | integer | 월 |
+| `detail.totalCoinUsed` | number | 총 코인 사용량 |
+| `detail.modelUsage[]` | array | 모델별 사용량 |
+| `detail.dailyUsage[]` | array | 일별 사용량 |
+
+**모델별 상세 (ModelUsageDetail)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.modelUsage[].modelId` | integer | 모델 ID |
+| `detail.modelUsage[].modelName` | string | 모델 이름 |
+| `detail.modelUsage[].displayName` | string | 표시 이름 |
+| `detail.modelUsage[].coinUsed` | number | 사용 코인 |
+| `detail.modelUsage[].messageCount` | integer | 메시지 수 |
+| `detail.modelUsage[].tokenCount` | number | 토큰 수 |
+| `detail.modelUsage[].percentage` | number | 비율(%) |
+
+**일별 상세 (DailyUsageDetail)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.dailyUsage[].date` | string | 날짜 (`YYYY-MM-DD`) |
+| `detail.dailyUsage[].coinUsed` | number | 사용 코인 |
+| `detail.dailyUsage[].messageCount` | integer | 메시지 수 |
+
+#### 사용자 통계 조회
+- **Method**: GET `/api/v1/dashboard/stats`
+- **인증**: 필수
+
+**성공 응답 (200)** (`UserStatsResponse`)
+```json
+{
+  "success": true,
+  "detail": {
+    "totalCoinPurchased": 200.0,
+    "totalCoinUsed": 99.5,
+    "currentBalance": 100.5,
+    "totalMessages": 500,
+    "totalChatRooms": 20,
+    "mostUsedModel": {
+      "modelId": 1,
+      "modelName": "gpt-4",
+      "displayName": "GPT-4",
+      "usagePercentage": 60.0
     },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+    "last30DaysUsage": 25.5,
+    "memberSince": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (UserStatsResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.totalCoinPurchased` | number | 누적 구매(충전) |
+| `detail.totalCoinUsed` | number | 누적 사용 |
+| `detail.currentBalance` | number | 현재 잔액 |
+| `detail.totalMessages` | integer | 메시지 수 |
+| `detail.totalChatRooms` | integer | 채팅방 수 |
+| `detail.mostUsedModel` | object | 최다 사용 모델(없으면 `null`) |
+| `detail.last30DaysUsage` | number | 최근 30일 사용량 |
+| `detail.memberSince` | string | 가입 시각 (ISO 8601) |
+
+**최다 사용 모델 (MostUsedModel)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.mostUsedModel.modelId` | integer | 모델 ID |
+| `detail.mostUsedModel.modelName` | string | 모델 이름 |
+| `detail.mostUsedModel.displayName` | string | 표시 이름 |
+| `detail.mostUsedModel.usagePercentage` | number | 사용 비율(%) |
+
+---
+
+### 9. 관리자 (Admin)
+
+#### [관리자] 사용자 지갑 잔액 직접 설정
+- **Method**: PATCH `/api/v1/admin/wallet`
+- **인증**: 필수 (ADMIN)
+
+**쿼리 파라미터**
+| 파라미터 | 타입 | 설명 |
+|---|---|---|
+| `userId` | integer | 대상 사용자 ID |
+| `amount` | integer | 설정할 최종 잔액(코인) |
+
+**성공 응답 (200)** (본문은 `detail: null`)
+```json
+{
+  "success": true,
+  "detail": null,
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**오류**
+- **403 Forbidden**: 권한 부족 시 `ErrorResponse` 단독 객체로 응답될 수 있음
+- **404** `WALLET_NOT_FOUND`
+
+**403 응답 예시 (ErrorResponse 단독)**
+```json
+{
+  "code": "FORBIDDEN",
+  "message": "접근 권한이 없습니다"
+}
+```
 
 #### [관리자] AI 모델 등록
 - **Method**: POST `/api/v1/admin/models`
-- **설명**: 새로운 AI 모델을 등록합니다.
-- **인증**: 필수 (관리자 권한)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
+- **인증**: 필수 (ADMIN)
 
 **요청 본문**
 ```json
 {
   "modelName": "gpt-4-turbo",
   "displayName": "GPT-4 Turbo",
-  "displayExplain": "더 빠르고 저렴한 GPT-4",
+  "displayExplain": "설명",
   "inputPricePer1m": 0.01,
   "outputPricePer1m": 0.03,
   "isActive": true
 }
 ```
 
-**요청 필드**
+**요청 제약**
+| 필드 | 제약 |
+|---|---|
+| `modelName` | 정규식 `^[a-z0-9.-]+$` |
+| `displayName` | 최대 30자 |
+| `displayExplain` | 최대 200자 |
+| `inputPricePer1m` / `outputPricePer1m` | 0 이상 |
+| `isActive` | 필수 |
 
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| modelName | string | ✅ | 시스템 내부 모델 식별자 | 소문자, 하이픈 허용 |
-| displayName | string | ✅ | 프런트 표시 이름 | 최대 30자 |
-| displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1m | number | ✅ | 입력 1m 토큰당 USD 가격 | 0 이상 |
-| outputPricePer1m | number | ✅ | 출력 1m 토큰당 USD 가격 | 0 이상 |
-| isActive | boolean | ✅ | 활성화 여부 | - |
-
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "modelId": 3,
-      "modelName": "gpt-4-turbo",
-      "displayName": "GPT-4 Turbo",
-      "displayExplain": "더 빠르고 저렴한 GPT-4",
-      "inputPricePer1m": 0.01,
-      "outputPricePer1m": 0.03,
-      "isActive": true,
-      "createdAt": "2025-01-01T00:00:00Z",
-      "updatedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**: `AI 모델 상세 조회`와 동일
-
-**오류 응답 예시**
-- **400 Bad Request**: 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "modelName은 고유해야 합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 권한 부족
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "관리자 권한이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
+**성공 응답 (201)**: `AIModelResponse`
+```json
+{
+  "success": true,
+  "detail": {
+    "modelId": 3,
+    "modelName": "gpt-4-turbo",
+    "displayName": "GPT-4 Turbo",
+    "displayExplain": "설명",
+    "inputPricePer1m": 0.01,
+    "outputPricePer1m": 0.03,
+    "isActive": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
 
 #### [관리자] AI 모델 수정
 - **Method**: PUT `/api/v1/admin/models/{modelId}`
-- **설명**: AI 모델 정보를 수정합니다.
-- **인증**: 필수 (관리자 권한)
+- **인증**: 필수 (ADMIN)
+- **비고**: 요청 본문의 필드는 모두 선택이며, `null`이 아닌 값만 반영됩니다.
 
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| modelId | integer | 수정할 모델 ID |
-
-**요청 본문**
+**요청 본문 예시**
 ```json
 {
-  "displayName": "GPT-4 Turbo",
-  "displayExplain": "업데이트된 설명",
-  "inputPricePer1m": 0.01,
-  "outputPricePer1m": 0.03,
+  "displayName": "새 표시 이름",
+  "displayExplain": "새 설명",
+  "inputPricePer1m": 0.02,
+  "outputPricePer1m": 0.05,
   "isActive": true
 }
 ```
 
-**요청 필드**
+**성공 응답 (200)**: `AIModelResponse`
 
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| displayName | string | ❌ | 사용자 표시 이름 | 최대 30자 |
-| displayExplain | string | ❌ | 모델 설명 | 최대 200자 |
-| inputPricePer1m | number | ❌ | 입력 1m 토큰당 가격 | 0 이상 |
-| outputPricePer1m | number | ❌ | 출력 1m 토큰당 가격 | 0 이상 |
-| isActive | boolean | ❌ | 활성화 여부 | - |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "modelId": 1,
-      "modelName": "gpt-4",
-      "displayName": "GPT-4 Turbo",
-      "displayExplain": "업데이트된 설명",
-      "inputPricePer1m": 0.01,
-      "outputPricePer1m": 0.03,
-      "isActive": true,
-      "createdAt": "2024-12-01T00:00:00Z",
-      "updatedAt": "2025-01-02T00:00:00Z"
-    },
-    "timestamp": "2025-01-02T00:00:00Z"
-  }
-  ```
-
-**응답 필드**: `AI 모델 상세 조회`와 동일
-
-**오류 응답 예시**
-- **404 Not Found**: 모델 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "요청한 모델을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **400 Bad Request**: 가격이 음수
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "가격은 0 이상이어야 합니다.",
-      "details": "inputPricePer1m=-0.1"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### [관리자] AI 모델 삭제
+#### [관리자] AI 모델 삭제(비활성화)
 - **Method**: DELETE `/api/v1/admin/models/{modelId}`
-- **설명**: AI 모델을 삭제합니다.
-- **인증**: 필수 (관리자 권한)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| modelId | integer | 삭제할 모델 ID |
-
-**성공 응답**
-- **204 No Content**
-
-**오류 응답 예시**
-- **404 Not Found**: 모델 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "MODEL_NOT_FOUND",
-      "message": "요청한 모델을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 이미 참조 중인 모델
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "CONFLICT",
-      "message": "활성 채팅방에서 사용 중인 모델입니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-### 6. 지갑 (UserWallet)
-
-#### 지갑 조회
-- **Method**: GET `/api/v1/wallet`
-- **설명**: 현재 사용자의 지갑 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "walletId": 1,
-      "userId": 1,
-      "balance": 100.5,
-      "totalPurchased": 200.0,
-      "totalUsed": 99.5,
-      "lastTransactionAt": "2025-01-01T00:00:00Z",
-      "createdAt": "2025-01-01T00:00:00Z",
-      "updatedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.walletId | integer | 지갑 ID |
-| detail.userId | integer | 사용자 ID |
-| detail.balance | number | 현재 코인 잔액 |
-| detail.totalPurchased | number | 누적 충전 코인 |
-| detail.totalUsed | number | 누적 사용 코인 |
-| detail.lastTransactionAt | string | 마지막 거래 시각 |
-| detail.createdAt | string | 지갑 생성 시각 |
-| detail.updatedAt | string | 지갑 수정 시각 |
-
-**오류 응답 예시**
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 지갑 미생성
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "WALLET_NOT_FOUND",
-      "message": "지갑 정보가 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 잔액 조회
-- **Method**: GET `/api/v1/wallet/balance`
-- **설명**: 현재 사용자의 코인 잔액만 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "balance": 100.5
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.balance | number | 현재 코인 잔액 |
-
-**오류 응답 예시**
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 지갑 미생성
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "WALLET_NOT_FOUND",
-      "message": "지갑 정보가 존재하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-### 7. 결제 (PaymentHistory)
-
-#### 코인 충전 요청
-- **Method**: POST `/api/v1/payments`
-- **설명**: 결제 게이트웨이에 코인 충전 요청을 생성합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**요청 본문**
-```json
-{
-  "amountKrw": 10000.0,
-  "paymentMethod": "card",
-  "paymentGateway": "toss"
-}
-```
-
-**요청 필드**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| amountKrw | number | ✅ | 결제 금액 (KRW) | 1,000 이상 |
-| paymentMethod | string | ✅ | 결제 수단 | `card`, `transfer` 등 |
-| paymentGateway | string | ✅ | 결제 게이트웨이 코드 | 지원되는 게이트웨이만 허용 |
-
-**성공 응답**
-- **201 Created**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "paymentId": 1,
-      "transactionId": "unique-transaction-id",
-      "amountKrw": 10000.0,
-      "amountUsd": 7.5,
-      "coinAmount": 7.5,
-      "bonusCoin": 0.5,
-      "status": "pending",
-      "paymentUrl": "https://payment-gateway.com/checkout/abc123",
-      "createdAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.paymentId | integer | 생성된 결제 ID |
-| detail.transactionId | string | 게이트웨이 거래 ID |
-| detail.amountKrw | number | 결제 금액 (KRW) |
-| detail.amountUsd | number | 환산된 USD 금액 |
-| detail.coinAmount | number | 지급 예정 코인 |
-| detail.bonusCoin | number | 지급 예정 보너스 코인 |
-| detail.status | string | 현재 결제 상태 |
-| detail.paymentUrl | string | 결제 진행 URL |
-| detail.createdAt | string | 요청 생성 시각 |
-
-**오류 응답 예시**
-- **400 Bad Request**: 결제 금액 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "amountKrw는 1000 이상이어야 합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 중복 결제 요청
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "CONFLICT",
-      "message": "이미 처리 중인 결제 요청이 있습니다.",
-      "details": "transactionId=unique-transaction-id"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 결제 내역 조회
-- **Method**: GET `/api/v1/payments`
-- **설명**: 현재 사용자의 결제 내역을 페이지네이션하여 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**쿼리 파라미터**
-
-| 파라미터 | 타입 | 기본값 | 설명 | 제약사항 |
-|---------|------|--------|------|----------|
-| page | integer | 0 | 페이지 번호 | 0 이상 |
-| size | integer | 20 | 페이지 크기 | 1~100 |
-| status | string | - | 결제 상태 필터 | `pending`, `completed`, `failed`, `cancelled` |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "content": [
-        {
-          "paymentId": 1,
-          "transactionId": "unique-transaction-id",
-          "paymentMethod": "card",
-          "amountKrw": 10000.0,
-          "coinAmount": 7.5,
-          "bonusCoin": 0.5,
-          "status": "completed",
-          "createdAt": "2025-01-01T00:00:00Z",
-          "completedAt": "2025-01-01T00:01:00Z"
-        }
-      ],
-      "totalElements": 50,
-      "totalPages": 3,
-      "size": 20,
-      "number": 0
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **400 Bad Request**: 잘못된 상태값
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "지원하지 않는 결제 상태입니다.",
-      "details": "status=unknown"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 결제 상세 조회
-- **Method**: GET `/api/v1/payments/{paymentId}`
-- **설명**: 특정 결제 건의 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| paymentId | integer | 조회할 결제 ID |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "paymentId": 1,
-      "transactionId": "unique-transaction-id",
-      "paymentMethod": "card",
-      "amountKrw": 10000.0,
-      "amountUsd": 7.5,
-      "coinAmount": 7.5,
-      "bonusCoin": 0.5,
-      "status": "completed",
-      "paymentGateway": "toss",
-      "metadata": {},
-      "createdAt": "2025-01-01T00:00:00Z",
-      "completedAt": "2025-01-01T00:01:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **404 Not Found**: 결제 기록 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "PAYMENT_NOT_FOUND",
-      "message": "결제 내역을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 결제 접근
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 결제 완료 웹훅
-- **Method**: POST `/api/v1/payments/webhook`
-- **설명**: 결제 게이트웨이에서 전달한 웹훅을 처리하여 결제 완료/실패 후속 작업을 수행합니다.
-- **인증**: 게이트웨이별 시그니처 검증
-
-**요청 헤더**
-| 헤더 | 필수 | 설명 |
-|------|------|------|
-| Toss-Signature | ✅ | Toss 등 PG 사 서명값. 시그니처 검증에 사용합니다. |
-| Content-Type | ✅ | `application/json` |
-| X-Webhook-Id | ✅ | 게이트웨이가 부여한 웹훅 이벤트 고유 ID |
-
-**요청 본문**
-```json
-{
-  "eventType": "PAYMENT_APPROVED",
-  "eventId": "evt_20250101_0001",
-  "occurredAt": "2025-01-01T09:00:00+09:00",
-  "data": {
-    "orderId": "order-uuid",
-    "paymentKey": "pay_1234567890",
-    "transactionId": "unique-transaction-id",
-    "status": "DONE",
-    "totalAmount": 33000,
-    "currency": "KRW",
-    "approvedAt": "2025-01-01T09:00:00+09:00",
-    "method": "CARD",
-    "customer": {
-      "customerId": 1,
-      "email": "user@example.com"
-    },
-    "metadata": {
-      "paymentPlanId": 3,
-      "note": "정기 결제"
-    }
-  }
-}
-```
-
-**요청 필드**
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| eventType | string | ✅ | PG에서 발행한 이벤트 타입 (`PAYMENT_APPROVED`, `PAYMENT_FAILED` 등) |
-| eventId | string | ✅ | 웹훅 이벤트 고유 ID (중복 처리 방지) |
-| occurredAt | string | ✅ | 이벤트 발생 시각 (ISO 8601) |
-| data.orderId | string | ✅ | 내부 주문 번호 (결제 생성 시 전달한 값) |
-| data.paymentKey | string | ✅ | 게이트웨이 결제 키 |
-| data.transactionId | string | ✅ | PG 결제 트랜잭션 ID |
-| data.status | string | ✅ | 결제 상태 (`DONE`, `CANCELED`, `FAILED`) |
-| data.totalAmount | integer | ✅ | 결제 총 금액 (KRW) |
-| data.currency | string | ✅ | 통화 코드 (`KRW`, `USD` 등) |
-| data.approvedAt | string | ✅ | 결제 완료 시각 (ISO 8601) |
-| data.method | string | ✅ | 결제 수단 (`CARD`, `VIRTUAL_ACCOUNT` 등) |
-| data.customer.customerId | integer | ✅ | 사용자 ID (내부 식별자) |
-| data.customer.email | string | ✅ | 결제를 진행한 고객 이메일 |
-| data.metadata.paymentPlanId | integer | ❌ | 결제 플랜 ID (존재 시 플랜 결제 처리) |
-| data.metadata.note | string | ❌ | 기타 메타데이터 |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "status": "processed",
-      "transactionId": "unique-transaction-id",
-      "processedAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.status | string | 처리 결과 (`processed`, `ignored`) |
-| detail.transactionId | string | 내부에서 기록한 결제 트랜잭션 ID |
-| detail.processedAt | string | 서버에서 웹훅을 처리한 시각 |
-
-**오류 응답 예시**
-- **400 Bad Request**: 시그니처 검증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "웹훅 시그니처가 유효하지 않습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 유효하지 않은 시그니처 헤더
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "AUTHENTICATION_FAILED",
-      "message": "웹훅 접근이 승인되지 않았습니다.",
-      "details": "signature header missing"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 이미 처리된 트랜잭션
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "CONFLICT",
-      "message": "이미 처리된 결제입니다.",
-      "details": "transactionId=unique-transaction-id"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 결제 취소
-- **Method**: POST `/api/v1/payments/{paymentId}/cancel`
-- **설명**: 완료된 결제를 취소하고 코인을 회수합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| paymentId | integer | 취소할 결제 ID |
-
-**요청 본문**
-```json
-{
-  "reason": "고객 변심"
-}
-```
-
-**요청 필드**
-
-| 필드 | 타입 | 필수 | 설명 | 제약사항 |
-|------|------|------|------|----------|
-| reason | string | ✅ | 취소 사유 | 최대 200자 |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "paymentId": 1,
-      "transactionId": "unique-transaction-id",
-      "status": "cancelled",
-      "amountKrw": 10000.0,
-      "coinAmount": 7.5,
-      "refundedCoin": 7.5,
-      "cancelledAt": "2025-01-01T00:05:00Z"
-    },
-    "timestamp": "2025-01-01T00:05:00Z"
-  }
-  ```
-
-**응답 필드**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.paymentId | integer | 취소된 결제 ID |
-| detail.transactionId | string | 게이트웨이 거래 ID |
-| detail.status | string | 결제 상태 (`cancelled`) |
-| detail.amountKrw | number | 결제 금액 |
-| detail.coinAmount | number | 지급된 코인 |
-| detail.refundedCoin | number | 환불된 코인 |
-| detail.cancelledAt | string | 결제 취소 시각 |
-
-**오류 응답 예시**
-- **404 Not Found**: 결제 기록 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "PAYMENT_NOT_FOUND",
-      "message": "결제 내역을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **409 Conflict**: 취소 불가 상태
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "CONFLICT",
-      "message": "현재 상태에서 결제를 취소할 수 없습니다.",
-      "details": "status=failed"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-### 8. 코인 거래 내역 (CoinTransaction)
-
-#### 코인 거래 내역 조회
-- **Method**: GET `/api/v1/transactions`
-- **설명**: 현재 사용자의 코인 거래 내역을 필터링하여 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**쿼리 파라미터**
-
-| 파라미터 | 타입 | 기본값 | 설명 | 제약사항 |
-|---------|------|--------|------|----------|
-| page | integer | 0 | 페이지 번호 | 0 이상 |
-| size | integer | 20 | 페이지 크기 | 1~100 |
-| transactionType | string | - | 거래 유형 필터 | `purchase`, `usage`, `refund`, `bonus` |
-| startDate | string | - | ISO 날짜(YYYY-MM-DD) | 종료 일자와 함께 사용 |
-| endDate | string | - | ISO 날짜(YYYY-MM-DD) | 시작 일자 이상 |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "content": [
-        {
-          "transactionId": 1,
-          "transactionType": "usage",
-          "amount": -0.0003,
-          "balanceAfter": 99.9997,
-          "description": "GPT-4 메시지 전송",
-          "modelId": 1,
-          "modelName": "gpt-4",
-          "roomId": "uuid-v7",
-          "messageId": "uuid-v7",
-          "createdAt": "2025-01-01T00:00:00Z"
-        }
-      ],
-      "totalElements": 500,
-      "totalPages": 25,
-      "size": 20,
-      "number": 0
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.content | array | 페이지네이션된 거래 목록 |
-| detail.content[].transactionId | integer | 거래 ID |
-| detail.content[].transactionType | string | 거래 유형 (`purchase`, `usage`, `refund`, `bonus`) |
-| detail.content[].amount | number | 거래 금액 (코인 증감, 음수는 차감) |
-| detail.content[].balanceAfter | number | 거래 직후 잔액 |
-| detail.content[].description | string | 거래에 대한 설명 |
-| detail.content[].modelId | integer | 연관된 모델 ID (usage 유형에서 사용) |
-| detail.content[].modelName | string | 연관된 모델 시스템 이름 |
-| detail.content[].roomId | string | 연관된 채팅방 UUID (usage 유형에서 사용) |
-| detail.content[].messageId | string | 연관된 메시지 UUID (usage 유형에서 사용) |
-| detail.content[].createdAt | string | 거래 생성 시각 (ISO 8601) |
-| detail.totalElements | integer | 전체 거래 건수 |
-| detail.totalPages | integer | 전체 페이지 수 |
-| detail.size | integer | 페이지당 항목 수 |
-| detail.number | integer | 현재 페이지 번호 (0 기반) |
-
-**오류 응답 예시**
-- **400 Bad Request**: 날짜 범위 오류
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "종료 일자는 시작 일자 이후여야 합니다.",
-      "details": "startDate=2025-02-01,endDate=2025-01-01"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 거래 상세 조회
-- **Method**: GET `/api/v1/transactions/{transactionId}`
-- **설명**: 특정 코인 거래의 상세 정보를 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**경로 변수**
-
-| 변수 | 타입 | 설명 |
-|------|------|------|
-| transactionId | integer | 조회할 거래 ID |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "transactionId": 1,
-      "userId": 1,
-      "roomId": "uuid-v7",
-      "messageId": "uuid-v7",
-      "transactionType": "usage",
-      "amount": -0.0003,
-      "balanceAfter": 99.9997,
-      "description": "GPT-4 메시지 전송",
-      "modelId": 1,
-      "createdAt": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**응답 필드**
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| detail.transactionId | integer | 거래 ID |
-| detail.userId | integer | 거래 소유자 ID |
-| detail.roomId | string | 거래와 연관된 채팅방 UUID (usage 유형에서만 존재) |
-| detail.messageId | string | 거래와 연관된 메시지 UUID (usage 유형에서만 존재) |
-| detail.transactionType | string | 거래 유형 (`purchase`, `usage`, `refund`, `bonus`) |
-| detail.amount | number | 거래 금액 (코인 증감) |
-| detail.balanceAfter | number | 거래 직후 잔액 |
-| detail.description | string | 거래 설명 |
-| detail.modelId | integer | 연관된 모델 ID (usage 유형에서만 존재) |
-| detail.createdAt | string | 거래 생성 시각 (ISO 8601) |
-
-**오류 응답 예시**
-- **404 Not Found**: 거래 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "TRANSACTION_NOT_FOUND",
-      "message": "거래 내역을 찾을 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 다른 사용자의 거래 접근
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "접근 권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-### 9. 대시보드 (Dashboard)
-
-#### 모델별 가격 대시보드
-- **Method**: GET `/api/v1/dashboard/models/pricing`
-- **설명**: 모든 활성화된 AI 모델의 1,000,000토큰당 USD 가격 정보를 조회합니다.
-- **인증**: Public
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": [
-      {
-        "modelId": 1,
-        "modelName": "gpt-4",
-        "displayName": "GPT-4",
-        "inputPricePer1m": 0.03,
-        "outputPricePer1m": 0.06,
-        "isActive": true
-      }
-    ],
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **503 Service Unavailable**: 가격 계산 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "SYSTEM_ILLEGAL_STATE",
-      "message": "대시보드 데이터를 불러오지 못했습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 월별 모델별 코인 사용량 대시보드
-- **Method**: GET `/api/v1/dashboard/usage/monthly`
-- **설명**: 현재 사용자의 월별 모델별 코인 사용량 통계를 조회합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**쿼리 파라미터**
-
-| 파라미터 | 타입 | 기본값 | 설명 |
-|---------|------|--------|------|
-| year | integer | 현재 연도 | 조회할 연도 |
-| month | integer | 현재 월 | 1~12 |
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "year": 2025,
-      "month": 1,
-      "totalCoinUsed": 50.5,
-      "modelUsage": [
-        {
-          "modelId": 1,
-          "modelName": "gpt-4",
-          "displayName": "GPT-4",
-          "coinUsed": 30.0,
-          "messageCount": 150,
-          "tokenCount": 50000,
-          "percentage": 59.4
-        }
-      ],
-      "dailyUsage": [
-        {
-          "date": "2025-01-01",
-          "coinUsed": 2.5,
-          "messageCount": 10
-        }
-      ]
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **400 Bad Request**: 잘못된 월 값
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "VALIDATION_ERROR",
-      "message": "month는 1과 12 사이여야 합니다.",
-      "details": "month=13"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-#### 사용자 통계 요약
-- **Method**: GET `/api/v1/dashboard/stats`
-- **설명**: 현재 사용자의 코인 및 활동 통계를 요약합니다.
-- **인증**: 필수 (Bearer Token)
-
-**요청 헤더**
-```http
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-**성공 응답**
-- **200 OK**
-  ```json
-  {
-    "success": true,
-    "detail": {
-      "totalCoinPurchased": 200.0,
-      "totalCoinUsed": 99.5,
-      "currentBalance": 100.5,
-      "totalMessages": 500,
-      "totalChatRooms": 20,
-      "mostUsedModel": {
-        "modelId": 1,
-        "modelName": "gpt-4",
-        "displayName": "GPT-4",
-        "usagePercentage": 60.0
-      },
-      "last30DaysUsage": 25.5,
-      "memberSince": "2025-01-01T00:00:00Z"
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **401 Unauthorized**: 인증 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **503 Service Unavailable**: 통계 집계 실패
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "SYSTEM_ILLEGAL_STATE",
-      "message": "통계 데이터를 계산할 수 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
----
-
-## 관리자 API
-
-### 지갑 잔액 직접 설정 (Admin Wallet Modify)
-
-- **Method**: `PATCH /api/v1/admin/wallet`
-- **설명**: 관리자가 사용자의 지갑 잔액을 직접 설정합니다. ADMIN 역할만 접근 가능합니다.
-- **인증**: 필수 (Bearer Token + ADMIN 역할)
-- **권한**: `@PreAuthorize("hasRole('ADMIN')")`
-
-**요청 헤더**
-```http
-Authorization: Bearer <ADMIN_ACCESS_TOKEN>
-```
-
-**쿼리 파라미터**
-
-| 파라미터 | 타입 | 설명 | 제약사항 |
-|---------|------|------|----------|
-| `userId` | Long | 사용자 ID | 필수, 양수 |
-| `amount` | Integer | 설정할 잔액 | 필수, 양수 |
-
-**요청 예시**
-```http
-PATCH /api/v1/admin/wallet?userId=1&amount=10000
-Authorization: Bearer <ADMIN_ACCESS_TOKEN>
-```
-
-**성공 응답**
-- **200 OK**: 지갑 잔액 설정 성공
-  ```json
-  {
-    "success": true,
-    "detail": null,
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**오류 응답 예시**
-- **401 Unauthorized**: 인증 실패 또는 토큰 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "INVALID_TOKEN",
-      "message": "인증이 필요합니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **403 Forbidden**: 권한 없음 (ADMIN이 아닌 경우)
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "FORBIDDEN",
-      "message": "권한이 없습니다.",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-- **404 Not Found**: 지갑을 찾을 수 없음
-  ```json
-  {
-    "success": false,
-    "detail": {
-      "code": "WALLET_NOT_FOUND",
-      "message": "지갑을 찾을 수 없습니다: {userId}",
-      "details": null
-    },
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-  ```
-
-**구현 상세**
-
-1. **요청 처리**:
-   - userId: 사용자 ID 조회
-   - amount: 설정할 잔액 (현재 잔액과의 차이 계산)
-
-2. **비즈니스 로직**:
-   - 현재 잔액 조회
-   - 차이 계산 (newBalance - currentBalance)
-   - 차이가 양수면 `addBalance()`, 음수면 `deductBalance()` 호출
-
-3. **로깅**:
-   - WARN 레벨: 관리자의 지갑 직접 설정 시작
-   - INFO 레벨: 설정 완료 (userId, 이전 잔액, 현재 잔액)
+- **인증**: 필수 (ADMIN)
+- **성공**: `204 No Content`

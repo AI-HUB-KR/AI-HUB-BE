@@ -26,10 +26,9 @@
 ```json
 {
   "success": true,
-  "data": {
-    // 실제 응답 데이터
+  "detail": {
+    // 실제 응답 데이터 (없으면 null)
   },
-  "message": "요청이 성공적으로 처리되었습니다",
   "timestamp": "2025-01-01T00:00:00Z"
 }
 ```
@@ -38,7 +37,7 @@
 ```json
 {
   "success": false,
-  "error": {
+  "detail": {
     "code": "ERROR_CODE",
     "message": "오류 메시지",
     "details": "상세 오류 정보 (선택적)"
@@ -74,45 +73,27 @@
 
 모든 에러 코드는 `global/error/ErrorCode.java` Enum에 중앙 집중식으로 정의합니다.
 
-**중요**: ErrorCode는 `code`(에러코드)와 `message`(에러메시지)만 포함하며, **HttpStatus는 포함하지 않습니다**.
+**중요**: ErrorCode는 `message`만 포함하며, **code 값은 enum 이름(name)을 그대로 사용합니다**.
 HttpStatus는 `GlobalExceptionHandler`의 `resolveHttpStatus()` 메서드에서 매핑됩니다.
 
 ```java
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
-    // 인증 전 (Public API) - 보안을 위해 일반화된 메시지
-    AUTHENTICATION_FAILED("AUTH_001", "인증에 실패했습니다"),
-    VALIDATION_ERROR("VALID_001", "입력값 검증에 실패했습니다"),
+    AUTHENTICATION_FAILED("인증에 실패했습니다"),
+    VALIDATION_ERROR("입력값 검증에 실패했습니다");
 
-    // 인증 후 (Authenticated API) - 구체적인 메시지
-    USER_NOT_FOUND("USER_001", "사용자를 찾을 수 없습니다"),
-
-    // 외부 서비스 오류
-    AI_SERVER_ERROR("EXT_001", "AI 서버와의 통신에 실패했습니다"),
-
-    // 공통 오류
-    INTERNAL_SERVER_ERROR("SYS_002", "서버 내부 오류가 발생했습니다");
-
-    private final String code;
     private final String message;
+
+    public String getCode() {
+        return this.name();
+    }
 }
 ```
 
 ### 에러 코드 네이밍 규칙
 - **ErrorCode 이름**: 대문자 스네이크 케이스 (예: `ROOM_NOT_FOUND`)
-- **code 필드**: 도메인 접두사 + 일련번호 (예: `"AUTH_001"`, `"USER_001"`, `"PAYMENT_001"`)
-  - `AUTH_xxx`: 인증 관련 에러
-  - `VALID_xxx`: 검증 관련 에러
-  - `USER_xxx`: 사용자 관련 에러
-  - `ROOM_xxx`: 채팅방 관련 에러
-  - `MSG_xxx`: 메시지 관련 에러
-  - `MODEL_xxx`: AI 모델 관련 에러
-  - `WALLET_xxx`: 지갑 관련 에러
-  - `PAYMENT_xxx`: 결제 관련 에러
-  - `TRANS_xxx`: 거래 관련 에러
-  - `EXT_xxx`: 외부 서비스 관련 에러
-  - `SYS_xxx`: 시스템 관련 에러
+- **응답 code 값**: ErrorCode enum 이름을 그대로 사용 (예: `ROOM_NOT_FOUND`)
 - **명확하고 구체적인 이름** 사용
 
 ### ErrorCode → HttpStatus 매핑
@@ -261,7 +242,7 @@ return ResponseEntity
 
 ### ErrorResponse (에러 응답 객체)
 
-**위치**: `global/response/ErrorResponse.java`
+**위치**: `global/common/response/ErrorResponse.java`
 
 ```java
 @Builder
@@ -296,17 +277,19 @@ ApiResponse.error(errorResponse);
 `@RestControllerAdvice`를 사용하여 전역 예외를 처리합니다.
 
 ### 처리되는 예외 타입
-1. **IllegalSystemStateException**: 시스템 상태 불일치 (토큰 해싱 실패 등)
-2. **BaseException**: 모든 커스텀 비즈니스 예외
+1. **BaseException**: 모든 커스텀 비즈니스 예외 (도메인 예외 포함)
+2. **AccessDeniedException**: `@PreAuthorize` 권한 체크 실패
 3. **MethodArgumentNotValidException**: `@Valid` 검증 실패
 4. **IllegalArgumentException**: 잘못된 인자
-5. **Exception**: 예상치 못한 모든 예외
+5. **ResponseStatusException**: 안전망 (커스텀 예외로 대체 권장)
+6. **Exception**: 예상치 못한 모든 예외
 
 ### 예외 처리 흐름
 ```
 예외 발생 → GlobalExceptionHandler 캐치
 → ErrorCode 추출 → ErrorResponse 생성
-→ ApiResponse<ErrorResponse>로 래핑 → HTTP 응답
+→ (기본) ApiResponse<ErrorResponse>로 래핑 → HTTP 응답
+→ (예외) AccessDeniedException은 ErrorResponse만 반환
 ```
 
 ### 모든 예외 핸들러의 반환 타입
@@ -314,6 +297,10 @@ ApiResponse.error(errorResponse);
 public ResponseEntity<ApiResponse<ErrorResponse>> handle...Exception(...) {
     ApiResponse<ErrorResponse> response = ApiResponse.error(...);
     return ResponseEntity.status(...).body(response);
+}
+
+public ResponseEntity<ErrorResponse> handleAccessDeniedException(...) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(ErrorCode.FORBIDDEN));
 }
 ```
 
@@ -327,10 +314,10 @@ public class ChatRoomController {
 
     private final ChatRoomService chatRoomService;
 
-    @GetMapping("/api/chat-rooms/{roomId}")
+    @GetMapping("/api/v1/chat-rooms/{roomId}")
     public ResponseEntity<ApiResponse<ChatRoomResponse>> getChatRoom(@PathVariable UUID roomId) {
         ChatRoomResponse response = chatRoomService.getChatRoom(roomId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }
 ```
@@ -366,14 +353,14 @@ public class ChatRoomService {
 
 ### Validation 예외
 ```java
-@PostMapping("/api/chat-rooms")
+@PostMapping("/api/v1/chat-rooms")
 public ResponseEntity<ApiResponse<ChatRoomResponse>> createChatRoom(
     @Valid @RequestBody CreateChatRoomRequest request) {
 
     ChatRoomResponse response = chatRoomService.createChatRoom(request);
     return ResponseEntity
         .status(HttpStatus.CREATED)
-        .body(ApiResponse.success(response, "채팅방이 생성되었습니다"));
+        .body(ApiResponse.ok(response));
 }
 
 // DTO
@@ -784,40 +771,49 @@ try {
 
     // SSE 이벤트 처리
     for (String line : (Iterable<String>) stream::iterator) {
-        if (line.startsWith("data: ")) {
-            String jsonData = line.substring(6);
-            SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
+        if (line == null || line.isBlank()) continue;
 
-            switch (event.type()) {
-                case "error":
-                    if (event.error() != null) {
-                        log.error("AI 서버 에러: {}", event.error().message());
-                        throw new AIServerException(event.error().message());
-                    }
-                    break;
+        // AI 서버 이벤트 예: {"type":"response","data":"텍스트 조각"} / {"type":"usage","data":{...}}
+        SseEvent event = objectMapper.readValue(line, SseEvent.class);
 
-                case "response.output_text.delta":
-                    // 클라이언트에게 delta 전달
-                    emitter.send(SseEmitter.event()
-                            .name("delta")
-                            .data(event.delta()));
-                    break;
-            }
+        switch (event.type()) {
+            case "response":
+                emitter.send(SseEmitter.event()
+                        .name("response")
+                        .data(event));
+                break;
+
+            case "usage":
+                // usage는 스트림 종료 시점에 도착 (토큰 사용량/responseId)
+                // 필요시 event.data()를 UsageData로 변환하여 후처리
+                break;
+
+            default:
+                log.warn("알 수 없는 이벤트 타입: {}", event.type());
+                break;
         }
     }
 
     emitter.complete();
 
+} catch (JsonProcessingException e) {
+    log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
+    emitter.completeWithError(new AIServerException("AI 응답 형식이 유효하지 않습니다", e));
+
 } catch (IOException e) {
     log.error("SSE 통신 에러: {}", e.getMessage(), e);
     emitter.completeWithError(new AIServerException("SSE 연결 실패", e));
+
+} catch (IllegalStateException e) {
+    log.error("스트림 변환 실패: {}", e.getMessage(), e);
+    emitter.completeWithError(new AIServerException("스트림 처리 중 오류가 발생했습니다", e));
 }
 ```
 
 **SSE 에러 처리 포인트**:
 1. **연결 단계**: IOException (네트워크 에러)
 2. **파싱 단계**: JsonProcessingException (잘못된 JSON)
-3. **이벤트 단계**: AIServerException (AI 서버가 보낸 error 이벤트)
+3. **스트림 변환 단계**: IllegalStateException (toStream 변환 실패)
 4. **전송 단계**: IOException (클라이언트 연결 끊김)
 
 ## 8. 체크리스트
@@ -829,7 +825,7 @@ try {
 - [ ] 서비스 레이어에서 적절한 예외 발생
 - [ ] 컨트롤러는 예외를 처리하지 않고 `GlobalExceptionHandler`에 위임
 - [ ] 인증 전/후 보안 원칙 준수
-- [ ] 응답은 항상 `ApiResponse`로 래핑
+- [ ] 응답은 기본적으로 `ApiResponse`로 래핑 (예외: AccessDeniedException은 `ErrorResponse`)
 
 **외부 서비스 통신 시 추가 확인**:
 - [ ] 세분화된 예외 처리 (IOException, JsonProcessingException, etc.)

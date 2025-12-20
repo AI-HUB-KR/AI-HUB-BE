@@ -2,7 +2,7 @@
 
 > 이 문서는 코드베이스 탐색 시 빠르게 필요한 파일을 찾을 수 있도록 작성된 구조 가이드입니다.
 >
-> 마지막 업데이트: 2025-11-23
+> 마지막 업데이트: 2025-12-18
 
 ---
 
@@ -26,12 +26,12 @@
 **패키지 전략**: Package by Feature (도메인별 패키지 구조)
 
 ### 통계
-- **전체 Java 파일**: 110개+
-- **Entity**: 11개
+- **전체 Java 파일**: 123개
+- **Entity**: 9개
 - **Repository**: 9개
-- **Service**: 14개
-- **Controller**: 11개
-- **DTO**: 30개+
+- **Service**: 17개
+- **Controller**: 12개
+- **DTO**: 34개
 
 ---
 
@@ -75,7 +75,8 @@
 ```
 controller/
 ├── admin/
-│   └── AdminAIModelController.java      # 관리자 AI 모델 관리 API
+│   ├── AdminAIModelController.java      # 관리자 AI 모델 관리 API
+│   └── AdminWalletModifyController.java # 관리자 지갑 잔액 수정 API
 ├── aimodel/AIModelController.java               # AI 모델 조회 API
 ├── auth/
 │   ├── AuthController.java                      # OAuth2 로그인 API
@@ -101,8 +102,9 @@ controller/
 
 ```
 application/
-├── admin/aimodel/
+├── admin/
 │   ├── AdminAIModelService.java                 # 관리자 AI 모델 서비스
+│   ├── AdminWalletModifyService.java            # 관리자 지갑 잔액 수정 서비스
 │   └── dto/
 │       ├── CreateAIModelRequest.java
 │       └── UpdateAIModelRequest.java
@@ -126,16 +128,24 @@ application/
 │   │       ├── CreateChatRoomRequest.java
 │   │       └── UpdateChatRoomRequest.java
 │   └── message/
-│       ├── MessageService.java                  # 메시지 조회/전송/파일업로드 서비스
+│       ├── AiSseHandler.java                    # AI 서버 SSE 스트리밍 핸들러
+│       ├── FileValidationService.java           # 파일 검증
+│       ├── FileUploadService.java               # AI 서버 파일 업로드
+│       ├── MessageRequestBuilder.java           # AI 요청 바디 빌더
+│       ├── MessageTransactionService.java       # 메시지 저장/정산 트랜잭션
+│       ├── MessageService.java                  # 메시지 조회/전송(스트리밍) 오케스트레이션
 │       └── dto/
 │           ├── MessageListItemResponse.java
 │           ├── MessageResponse.java
 │           ├── FileUploadResponse.java              # 파일 업로드 응답
 │           ├── SendMessageRequest.java              # 메시지 전송 요청
+│           ├── ChatHistoryMessage.java              # AI 요청용 히스토리 DTO
+│           ├── FileType.java                        # 파일 타입(image/document/audio)
 │           ├── AiServerResponse.java                # AI 서버 응답 래퍼
 │           ├── AiUploadData.java                    # AI 업로드 응답 데이터
 │           ├── AiChatData.java                      # AI 채팅 응답 데이터
 │           ├── AiUsage.java                         # 토큰 사용량 정보
+│           ├── AiStreamingResult.java               # 스트리밍 최종 결과
 │           └── SseEvent.java                        # SSE 이벤트 파싱 DTO
 ├── dashboard/
 │   ├── DashboardService.java                    # 대시보드 통계 서비스
@@ -152,16 +162,16 @@ application/
 │   └── dto/
 │       ├── CoinTransactionResponse.java
 │       └── PaymentResponse.java
-└── user/
-    ├── UserService.java                         # 사용자 정보 서비스
-    ├── dto/
-    │   ├── UpdateUserRequest.java
-    │   └── UserResponse.java
-    └── userwallet/
-        ├── UserWalletService.java               # 사용자 지갑 서비스
-        └── dto/
-            ├── BalanceResponse.java
-            └── UserWalletResponse.java
+├── user/
+│   ├── UserService.java                         # 사용자 정보 서비스
+│   └── dto/
+│       ├── UpdateUserRequest.java
+│       └── UserResponse.java
+└── userwallet/
+    ├── UserWalletService.java                   # 사용자 지갑 서비스
+    └── dto/
+        ├── BalanceResponse.java
+        └── UserWalletResponse.java
 ```
 
 **역할**: 비즈니스 로직, 트랜잭션 관리(@Transactional), DTO 변환
@@ -175,7 +185,7 @@ application/
 domain/
 ├── aimodel/
 │   ├── AIModel.java                 # AI 모델 엔티티
-│   └── repository/AIModelRepository.java
+│   └── AIModelRepository.java
 ├── auth/
 │   ├── AccessToken.java
 │   ├── AccessTokenRepository.java
@@ -193,7 +203,6 @@ domain/
 │   ├── CoinTransactionRepository.java
 │   ├── PaymentHistory.java               # 결제 내역 엔티티
 │   └── PaymentHistoryRepository.java
-├── token/Token.java                             # 토큰 공통 인터페이스
 └── user/
     ├── User.java                                # 사용자 엔티티 (Soft Delete)
     ├── UserRepository.java
@@ -211,20 +220,26 @@ domain/
 
 ```
 global/
-├── application/GlobalApplication.java           # 전역 애플리케이션 설정
+├── application/
+│   └── CookieService.java                       # 토큰 쿠키 유틸
 ├── auth/
+│   ├── CustomAuthenticationSuccessHandler.java  # OAuth2 성공 핸들러
+│   ├── CustomOauth2User.java                    # OAuth2 사용자 Principal
 │   ├── SecurityContextHelper.java               # ✨ 보안 컨텍스트 헬퍼 (공통)
 │   ├── jwt/
 │   │   ├── JwtAuthenticationEntryPoint.java     # JWT 인증 실패 핸들러
 │   │   ├── JwtAuthenticationFilter.java         # JWT 인증 필터
 │   │   └── JwtTokenProvider.java                # JWT 토큰 생성/검증
 │   └── userinfo/
-│       ├── CustomOauth2User.java                # OAuth2 사용자 정보
-│       └── OAuth2SuccessHandler.java            # OAuth2 성공 핸들러
+│       ├── OAuth2UserInfoFactory.java           # OAuth2 유저정보 팩토리
+│       ├── KakaoOAuth2UserInfo.java             # Kakao 유저정보
+│       └── OAuth2UserInfo.java                  # 공통 유저정보 인터페이스
 ├── common/
-│   └── response/ApiResponse.java                # 공통 API 응답 래퍼
+│   └── response/
+│       ├── ApiResponse.java                     # 공통 API 응답 래퍼
+│       └── ErrorResponse.java                   # 공통 에러 응답
 ├── config/
-│   ├── JpaConfig.java                           # JPA 설정 (Auditing)
+│   ├── JpaAuditingConfig.java                   # JPA 설정 (Auditing)
 │   ├── OpenApiConfig.java                       # Swagger/OpenAPI 설정
 │   ├── SecurityConfig.java                      # Spring Security 설정
 │   └── WebClientConfig.java                     # WebClient 설정 (AI 서버 통신)
@@ -262,12 +277,12 @@ API Endpoints:
 ### UserWallet (사용자 지갑)
 ```
 Controller:  controller/user/UserWalletController.java
-Service:     application/user/userwallet/UserWalletService.java
+Service:     application/userwallet/UserWalletService.java
 Entity:      domain/user/UserWallet.java
 Repository:  domain/user/UserWalletRepository.java
 DTOs:
-  - application/user/userwallet/dto/UserWalletResponse.java
-  - application/user/userwallet/dto/BalanceResponse.java
+  - application/userwallet/dto/UserWalletResponse.java
+  - application/userwallet/dto/BalanceResponse.java
 
 API Endpoints:
   - GET /api/v1/wallet          # 지갑 상세 정보
@@ -278,30 +293,40 @@ API Endpoints:
 ```
 Controller:  controller/aimodel/AIModelController.java
 Service:     application/aimodel/AIModelService.java
-Entity:      domain/aimodel/entity/AIModel.java
-Repository:  domain/aimodel/repository/AIModelRepository.java
+Entity:      domain/aimodel/AIModel.java
+Repository:  domain/aimodel/AIModelRepository.java
 DTOs:
   - application/aimodel/dto/AIModelResponse.java
 
 API Endpoints:
   - GET /api/v1/models              # 활성 모델 목록
-  - GET /api/v1/models/{modelId}   # 모델 상세
 ```
 
 ### Admin AIModel (관리자 AI 모델 관리)
 ```
-Controller:  controller/admin/aimodel/AdminAIModelController.java
-Service:     application/admin/aimodel/AdminAIModelService.java
-Entity:      domain/aimodel/entity/AIModel.java (공유)
-Repository:  domain/aimodel/repository/AIModelRepository.java (공유)
+Controller:  controller/admin/AdminAIModelController.java
+Service:     application/admin/AdminAIModelService.java
+Entity:      domain/aimodel/AIModel.java (공유)
+Repository:  domain/aimodel/AIModelRepository.java (공유)
 DTOs:
-  - application/admin/aimodel/dto/CreateAIModelRequest.java
-  - application/admin/aimodel/dto/UpdateAIModelRequest.java
+  - application/admin/dto/CreateAIModelRequest.java
+  - application/admin/dto/UpdateAIModelRequest.java
 
 API Endpoints:
   - POST   /api/v1/admin/models           # 모델 생성 (관리자)
-  - PUT    /api/v1/admin/models/{id}     # 모델 수정 (관리자)
-  - DELETE /api/v1/admin/models/{id}     # 모델 삭제 (관리자)
+  - PUT    /api/v1/admin/models/{modelId}     # 모델 수정 (관리자)
+  - DELETE /api/v1/admin/models/{modelId}     # 모델 삭제 (관리자)
+```
+
+### Admin Wallet (관리자 지갑 잔액 수정)
+```
+Controller:  controller/admin/AdminWalletModifyController.java
+Service:     application/admin/AdminWalletModifyService.java
+Entity:      domain/user/UserWallet.java
+Repository:  domain/user/UserWalletRepository.java
+
+API Endpoints:
+  - PATCH /api/v1/admin/wallet  # userId, amount (query params)
 ```
 
 ### Chat (채팅)
@@ -375,7 +400,7 @@ DTOs:
   - application/dashboard/dto/MostUsedModel.java
 
 API Endpoints:
-  - GET /api/v1/dashboard/models/pricing   # 모델 가격 정보 (Public)
+  - GET /api/v1/dashboard/models/pricing   # 모델 가격 정보 (인증 필요)
   - GET /api/v1/dashboard/usage/monthly    # 월별 사용량 통계
   - GET /api/v1/dashboard/stats            # 사용자 통계 요약
 ```
@@ -394,8 +419,9 @@ Repository:  domain/auth/AccessTokenRepository.java
              domain/auth/RefreshTokenRepository.java
 
 API Endpoints:
-  - POST /api/v1/auth/kakao      # Kakao OAuth2 로그인
-  - POST /api/v1/token/refresh   # 토큰 갱신
+  - GET  /oauth2/authorization/kakao  # Kakao OAuth2 로그인 시작(리다이렉트)
+  - POST /api/v1/token/refresh        # 토큰 갱신 (Refresh Token 쿠키 기반)
+  - POST /api/v1/auth/logout          # 로그아웃
 ```
 
 ---
@@ -407,7 +433,7 @@ API Endpoints:
 JWT 토큰 프로바이더:    global/auth/jwt/JwtTokenProvider.java
 JWT 인증 필터:          global/auth/jwt/JwtAuthenticationFilter.java
 JWT 예외 핸들러:        global/auth/jwt/JwtAuthenticationEntryPoint.java
-OAuth2 성공 핸들러:     global/auth/userinfo/OAuth2SuccessHandler.java
+OAuth2 성공 핸들러:     global/auth/CustomAuthenticationSuccessHandler.java
 OAuth2 사용자 서비스:   application/auth/CustomOAuth2UserService.java
 Security 설정:          global/config/SecurityConfig.java
 SecurityContext 헬퍼:   global/auth/SecurityContextHelper.java
@@ -423,7 +449,7 @@ API 응답 래퍼:          global/common/response/ApiResponse.java
 
 ### 설정 클래스
 ```
-JPA 설정:              global/config/JpaConfig.java
+JPA 설정:              global/config/JpaAuditingConfig.java
 OpenAPI/Swagger 설정:  global/config/OpenApiConfig.java
 Security 설정:         global/config/SecurityConfig.java
 WebClient 설정:        global/config/WebClientConfig.java
@@ -495,15 +521,13 @@ public class UserService {
 @RequiredArgsConstructor
 public class UserController {
 
-    @GetMapping("/{userId}")        // HTTP 메서드 + 경로
-    public ResponseEntity<ApiResponse<UserResponse>> getUser(
-        @PathVariable Integer userId   // 경로 변수
-    ) { }
+    @GetMapping("/me")              // HTTP 메서드 + 경로
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser() { }
 }
 
 // Entity 클래스
 @Entity
-@Table(name = "users")
+@Table(name = "\"user\"")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
@@ -587,11 +611,11 @@ UserResponse response = UserResponse.from(user);
 ### 파일 경로 규칙
 ```
 Controller:   controller/{domain}/{Domain}Controller.java
-Service:      application/{domain}/{Domain}Service.java
-Entity:       domain/{domain}/entity/{Domain}.java
-Repository:   domain/{domain}/repository/{Domain}Repository.java
-DTO:          application/{domain}/dto/{Name}.java
-Exception:    global/error/exception/{Name}Exception.java
+Service:      application/{domain}/**/*Service.java
+Entity:       domain/{domain}/*.java
+Repository:   domain/{domain}/*Repository.java
+DTO:          application/**/dto/*.java
+Exception:    global/error/exception/*Exception.java
 ```
 
 ---
