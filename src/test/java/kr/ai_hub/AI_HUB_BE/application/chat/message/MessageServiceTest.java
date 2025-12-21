@@ -1,9 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.application.chat.message;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageListItemResponse;
 import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.MessageResponse;
-import kr.ai_hub.AI_HUB_BE.application.chat.message.dto.SendMessageRequest;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
 import kr.ai_hub.AI_HUB_BE.domain.chat.ChatRoom;
@@ -31,7 +29,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,7 +38,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,13 +65,13 @@ class MessageServiceTest {
     private SecurityContextHelper securityContextHelper;
 
     @Mock
-    private WebClient aiServerWebClient;
+    private MessageRequestBuilder messageRequestBuilder;
 
     @Mock
-    private ObjectMapper objectMapper;
+    private AiSseHandler aiSseHandler;
 
     @Mock
-    private FileValidationService fileValidationService;
+    private FileUploadService fileUploadService;
 
     @InjectMocks
     private MessageService messageService;

@@ -25,7 +25,7 @@ AI Hub는 여러 AI API(OpenAI, Anthropic, Google AI 등)를 코인 기반 선�
 - **Spring Data JPA**: Hibernate 기반 ORM
 - **Spring Security**: OAuth2 Client + JWT 인증
 - **Spring Actuator**: Health check 및 모니터링
-- **WebFlux**: AI 서버 HTTP 클라이언트용 (WebClient만 사용)
+- **RestClient**: AI 서버 HTTP 클라이언트용 (동기식)
 
 ### Database
 - **PostgreSQL**: 운영 환경 데이터베이스
@@ -213,7 +213,7 @@ curl http://localhost:8080/actuator/health
 │   │   │       ├── application/     # 공통 서비스 (쿠키 등)
 │   │   │       ├── auth/            # JWT, OAuth2, 필터/핸들러
 │   │   │       ├── common/response/ # 공통 응답 DTO
-│   │   │       ├── config/          # Security, OpenAPI, WebClient
+│   │   │       ├── config/          # Security, OpenAPI, RestClient
 │   │   │       └── error/           # 전역 예외 및 커스텀 예외
 │   ├── resources/
 │   │   ├── application.yaml

@@ -10,10 +10,10 @@
   - `application.yaml`에 `spring.threads.virtual.enabled: true` 설정
   - `@Async` 어노테이션 사용 금지 (Virtual Threads가 자동으로 처리)
   - 동기 방식 코드 작성 (Virtual Threads가 I/O 블로킹 자동 처리)
-  - 블로킹 I/O 작업을 평범한 동기 코드로 작성 (예: `WebClient.toStream()`)
-- **외부 MSA 통신**: AI 서버와의 통신은 WebClient를 사용합니다
-  - WebClient는 HTTP 클라이언트로만 사용 (Reactive Stack 사용 안 함)
-  - `global/config/WebClientConfig.java`에서 설정 관리
+  - 블로킹 I/O 작업을 평범한 동기 코드로 작성 (예: `RestClient.exchange()` + `InputStream`)
+- **외부 MSA 통신**: AI 서버와의 통신은 RestClient를 사용합니다
+  - RestClient는 동기식 HTTP 클라이언트로만 사용
+  - `global/config/RestClientConfig.java`에서 설정 관리
   - SSE(Server-Sent Events) 스트리밍 지원
 - Response 및 Error 클래스들은 from 및 builder 패턴을 활용하여 일관된 생성 방식을 유지합니다
 - 추가적인 패키지나 디렉토리가 필요할 경우 `convention.md`에 명시된 구조를 참고하여 일관성 있게 확장합니다
@@ -565,9 +565,9 @@ logging:
 - [ ] 파라미터화된 로깅 사용 (`{}` 플레이스홀더)
 - [ ] 민감 정보 로깅 제외
 
-## 7. 외부 서비스 통신 에러 처리 (WebClient)
+## 7. 외부 서비스 통신 에러 처리 (RestClient)
 
-Virtual Threads 환경에서 WebClient를 사용할 때는 다음 원칙을 준수합니다.
+Virtual Threads 환경에서 RestClient를 사용할 때는 다음 원칙을 준수합니다.
 
 ### 7.1 세분화된 예외 처리 (Granular Exception Handling)
 
@@ -586,19 +586,15 @@ try {
 #### 좋은 예시 (Good)
 ```java
 try {
-    var stream = aiServerWebClient.post()
+    var result = aiServerRestClient.post()
             .uri("/ai/chat")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(requestBody)
-            .retrieve()
-            .bodyToFlux(String.class)
-            .toStream();
-
-    // Stream 처리 로직
-    for (String line : (Iterable<String>) stream::iterator) {
-        SseEvent event = objectMapper.readValue(jsonData, SseEvent.class);
-        // 이벤트 처리
-    }
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .body(requestBody)
+            .exchange((request, response) -> {
+                // Status 체크 및 SSE 파싱 로직
+                return parseSse(response);
+            });
 
 } catch (IOException e) {
     // SSE 통신 에러 (네트워크, 연결 실패 등)
@@ -611,8 +607,8 @@ try {
     throw new AIServerException("AI 응답 형식이 유효하지 않습니다", e);
 
 } catch (IllegalStateException e) {
-    // Stream 변환 실패
-    log.error("스트림 변환 실패: {}", e.getMessage(), e);
+    // 스트림 처리 실패
+    log.error("스트림 처리 실패: {}", e.getMessage(), e);
     throw new AIServerException("스트림 처리 중 오류가 발생했습니다", e);
 
 } catch (Exception e) {
@@ -631,32 +627,26 @@ try {
 
 ### 7.2 명시적 타임아웃 처리
 
-**WebClient의 block() 메서드 사용 시 반드시 타임아웃을 명시합니다.**
-
-#### 나쁜 예시 (Bad)
-```java
-AiServerResponse response = aiServerWebClient.post()
-        .uri("/ai/upload")
-        .bodyValue(requestBody)
-        .retrieve()
-        .bodyToMono(AiServerResponse.class)
-        .block();  // ❌ 타임아웃 미지정 (무한 대기 가능)
-```
+**RestClient는 ClientHttpRequestFactory의 read timeout으로 타임아웃을 제어합니다.**
 
 #### 좋은 예시 (Good)
 ```java
-AiServerResponse response = aiServerWebClient.post()
-        .uri("/ai/upload")
-        .bodyValue(requestBody)
-        .retrieve()
-        .bodyToMono(AiServerResponse.class)
-        .block(Duration.ofSeconds(30));  // ✅ 30초 타임아웃 명시
+@Bean
+public RestClient aiServerUploadClient() {
+    JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newHttpClient());
+    requestFactory.setReadTimeout(Duration.ofMinutes(1));  // ✅ 1분 타임아웃
+
+    return RestClient.builder()
+            .baseUrl(aiServerUrl)
+            .requestFactory(requestFactory)
+            .build();
+}
 ```
 
 **권장 타임아웃 값**:
 - 일반 API 호출: 10-30초
-- 파일 업로드: 30-60초
-- SSE 스트리밍: toStream() 사용 (타임아웃 불필요, Virtual Threads가 처리)
+- 파일 업로드: 1분 타임아웃
+- SSE 스트리밍: 5분 타임아웃 (AI 서버 응답 지연 대비)
 
 **필수 import**:
 ```java
@@ -736,25 +726,14 @@ protected void deleteUserMessage(Message userMessage) {
 - [ ] 삭제 실패 시에도 원본 예외는 유지
 - [ ] 삭제 성공/실패 모두 로깅
 
-### 7.4 스트림 변환 예외 처리
+### 7.4 SSE 스트리밍 파싱 주의 사항
 
-**Flux.toStream() 사용 시 IllegalStateException 처리를 포함합니다.**
+**표준 SSE 포맷을 기준으로 파싱합니다.**
 
-#### 주의 사항
-```java
-var stream = aiServerWebClient.post()
-        .uri("/ai/chat")
-        .retrieve()
-        .bodyToFlux(String.class)
-        .toStream();  // ⚠️ IllegalStateException 발생 가능
-```
-
-`toStream()` 메서드는 다음 상황에서 `IllegalStateException`을 던질 수 있습니다:
-- Reactive context가 올바르게 초기화되지 않은 경우
-- 스트림 변환 중 내부 상태 에러
-
-#### 처리 방법
-위의 7.1 세분화된 예외 처리 패턴에서 `IllegalStateException` catch 블록을 추가하여 처리합니다.
+- 이벤트는 빈 줄로 구분됩니다.
+- `event:` 라인이 있으면 이벤트 타입으로 사용합니다.
+- `data:` 라인은 여러 줄일 수 있으며, 줄바꿈으로 합칩니다.
+- `:` 로 시작하는 코멘트 라인은 무시합니다.
 
 ### 7.5 SSE 스트리밍 에러 처리
 
@@ -762,39 +741,15 @@ var stream = aiServerWebClient.post()
 
 ```java
 try {
-    var stream = aiServerWebClient.post()
+    var result = aiServerRestClient.post()
             .uri("/ai/chat")
-            .bodyValue(requestBody)
-            .retrieve()
-            .bodyToFlux(String.class)
-            .toStream();
-
-    // SSE 이벤트 처리
-    for (String line : (Iterable<String>) stream::iterator) {
-        if (line == null || line.isBlank()) continue;
-
-        // AI 서버 이벤트 예: {"type":"response","data":"텍스트 조각"} / {"type":"usage","data":{...}}
-        SseEvent event = objectMapper.readValue(line, SseEvent.class);
-
-        switch (event.type()) {
-            case "response":
-                emitter.send(SseEmitter.event()
-                        .name("response")
-                        .data(event));
-                break;
-
-            case "usage":
-                // usage는 스트림 종료 시점에 도착 (토큰 사용량/responseId)
-                // 필요시 event.data()를 UsageData로 변환하여 후처리
-                break;
-
-            default:
-                log.warn("알 수 없는 이벤트 타입: {}", event.type());
-                break;
-        }
-    }
-
-    emitter.complete();
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .body(requestBody)
+            .exchange((request, response) -> {
+                // event/data/blank line 기준으로 SSE 파싱
+                // response/usage 이벤트 처리 및 emitter 전송
+                return parseSse(response);
+            });
 
 } catch (JsonProcessingException e) {
     log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
@@ -805,7 +760,7 @@ try {
     emitter.completeWithError(new AIServerException("SSE 연결 실패", e));
 
 } catch (IllegalStateException e) {
-    log.error("스트림 변환 실패: {}", e.getMessage(), e);
+    log.error("스트림 처리 실패: {}", e.getMessage(), e);
     emitter.completeWithError(new AIServerException("스트림 처리 중 오류가 발생했습니다", e));
 }
 ```
@@ -813,7 +768,7 @@ try {
 **SSE 에러 처리 포인트**:
 1. **연결 단계**: IOException (네트워크 에러)
 2. **파싱 단계**: JsonProcessingException (잘못된 JSON)
-3. **스트림 변환 단계**: IllegalStateException (toStream 변환 실패)
+3. **스트림 처리 단계**: IllegalStateException (SSE 처리 실패)
 4. **전송 단계**: IOException (클라이언트 연결 끊김)
 
 ## 8. 체크리스트
@@ -829,7 +784,7 @@ try {
 
 **외부 서비스 통신 시 추가 확인**:
 - [ ] 세분화된 예외 처리 (IOException, JsonProcessingException, etc.)
-- [ ] block() 사용 시 명시적 타임아웃 설정
+- [ ] RestClient read timeout 설정 (호출 유형별)
 - [ ] 외부 서비스 실패 시 보상 트랜잭션 구현
 - [ ] SSE 스트리밍 시 중간 에러 처리
 - [ ] 스트림 변환 예외 (IllegalStateException) 처리

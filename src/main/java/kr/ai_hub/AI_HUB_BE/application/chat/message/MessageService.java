@@ -138,7 +138,9 @@ public class MessageService {
             // AI 응답 JSON 파싱 실패
             log.error("AI 응답 JSON 파싱 실패: {}", e.getMessage(), e);
             handleMessageError(userMessage, new AIServerException("AI 응답 형식이 유효하지 않습니다", e), emitter);
-
+        } catch (AIServerException e) {
+            log.error("AI 서버 응답 에러: {}", e.getMessage(), e);
+            handleMessageError(userMessage, e, emitter);
         } catch (IOException e) {
             // SSE 통신 에러
             log.error("SSE 통신 에러: {}", e.getMessage(), e);
