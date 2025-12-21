@@ -9,9 +9,10 @@ import lombok.Builder;
  * AI 서버로부터 수신하는 두 가지 타입의 이벤트:
  * 1. response: 텍스트 응답 스트리밍 ({"type":"response","data":"텍스트 조각"})
  * 2. usage: 사용량 메타데이터 ({"type":"usage","data":{...}})
+ * 3. error: 에러 이벤트 ({"type":"error","error":{...}})
  * </p>
  *
- * @param type 이벤트 타입 (response, usage)
+ * @param type 이벤트 타입 (response, usage, error)
  * @param data 이벤트 데이터 (response일 때 String, usage일 때 UsageData 객체)
  */
 @Builder
