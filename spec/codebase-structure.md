@@ -242,7 +242,7 @@ global/
 │   ├── JpaAuditingConfig.java                   # JPA 설정 (Auditing)
 │   ├── OpenApiConfig.java                       # Swagger/OpenAPI 설정
 │   ├── SecurityConfig.java                      # Spring Security 설정
-│   └── WebClientConfig.java                     # WebClient 설정 (AI 서버 통신)
+│   └── RestClientConfig.java                    # RestClient 설정 (AI 서버 통신)
 └── error/
     ├── ErrorCode.java                           # 에러 코드 Enum
     ├── GlobalExceptionHandler.java              # 전역 예외 핸들러
@@ -452,7 +452,7 @@ API 응답 래퍼:          global/common/response/ApiResponse.java
 JPA 설정:              global/config/JpaAuditingConfig.java
 OpenAPI/Swagger 설정:  global/config/OpenApiConfig.java
 Security 설정:         global/config/SecurityConfig.java
-WebClient 설정:        global/config/WebClientConfig.java
+RestClient 설정:       global/config/RestClientConfig.java
 ```
 
 ### 애플리케이션 진입점
