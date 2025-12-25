@@ -35,7 +35,6 @@ public class AdminAIModelService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse createModel(CreateAIModelRequest request) {
-        //validateAdminRole();
         log.info("관리자 모델 생성 요청: modelName={}", request.modelName());
 
         // 모델명 중복 체크
@@ -49,6 +48,7 @@ public class AdminAIModelService {
                 .displayExplain(request.displayExplain())
                 .inputPricePer1m(request.inputPricePer1m())
                 .outputPricePer1m(request.outputPricePer1m())
+                .modelMarkupRate(request.modelMarkupRate())
                 .isActive(request.isActive())
                 .build();
 
@@ -64,7 +64,6 @@ public class AdminAIModelService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse updateModel(Integer modelId, UpdateAIModelRequest request) {
-        //validateAdminRole();
         log.info("관리자 모델 수정 요청: modelId={}", modelId);
 
         AIModel model = aiModelRepository.findById(modelId)
@@ -75,6 +74,7 @@ public class AdminAIModelService {
                 request.displayExplain(),
                 request.inputPricePer1m(),
                 request.outputPricePer1m(),
+                request.modelMarkupRate(),
                 request.isActive()
         );
 
@@ -89,7 +89,6 @@ public class AdminAIModelService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteModel(Integer modelId) {
-        //validateAdminRole();
         log.info("관리자 모델 삭제(deactivate) 요청: modelId={}", modelId);
 
         aiModelRepository

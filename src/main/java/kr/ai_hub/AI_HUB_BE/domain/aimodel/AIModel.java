@@ -60,7 +60,7 @@ public class AIModel {
 
     public void update(String displayName, String displayExplain,
                        BigDecimal inputPricePer1m, BigDecimal outputPricePer1m,
-                       Boolean isActive) {
+                       BigDecimal modelMarkupRate,Boolean isActive) {
         if (displayName != null) {
             this.displayName = displayName;
         }
@@ -72,6 +72,9 @@ public class AIModel {
         }
         if (outputPricePer1m != null) {
             this.outputPricePer1m = outputPricePer1m;
+        }
+        if (modelMarkupRate != null) {
+            this.modelMarkupRate = modelMarkupRate;
         }
         if (isActive != null) {
             this.isActive = isActive;
