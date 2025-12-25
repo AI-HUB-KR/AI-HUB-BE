@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import kr.ai_hub.AI_HUB_BE.application.admin.AdminAIModelService;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.UpdateAIModelRequest;
+import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelDetailResponse;
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,17 @@ public class AdminAIModelController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(response));
+    }
+
+    /**
+     * AI 모델 토큰 원가와 markup를 포함한 상세 정보를 조회합니다 (관리자 전용).
+     */
+    @Operation(summary = "AI 모델 토큰 원가와 markup를 포함한 상세 조회")
+    @GetMapping("/{modelId}")
+    public ResponseEntity<ApiResponse<AIModelDetailResponse>> getModelDetails(@PathVariable Integer modelId) {
+        log.info("관리자 모델 상세 조회 API 호출: modelId={}", modelId);
+        AIModelDetailResponse response = adminAIModelService.getModelDetails(modelId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     /**

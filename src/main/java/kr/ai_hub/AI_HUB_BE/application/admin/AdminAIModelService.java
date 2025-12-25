@@ -2,6 +2,7 @@ package kr.ai_hub.AI_HUB_BE.application.admin;
 
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.UpdateAIModelRequest;
+import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelDetailResponse;
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
@@ -26,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminAIModelService {
 
     private final AIModelRepository aiModelRepository;
-    private final UserRepository userRepository;
-    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 새로운 AI 모델을 등록합니다 (관리자 전용).
@@ -56,6 +55,19 @@ public class AdminAIModelService {
         log.info("모델 생성 완료: modelId={}, modelName={}", savedModel.getModelId(), savedModel.getModelName());
 
         return AIModelResponse.from(savedModel);
+    }
+
+    /**
+     * AI 모델 토큰 원가와 markup를 포함한 상세 정보를 조회합니다 (관리자 전용).
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    public AIModelDetailResponse getModelDetails(Integer modelId) {
+        log.info("관리자 모델 상세 조회 요청: modelId={}", modelId);
+
+        AIModel model = aiModelRepository.findById(modelId)
+                .orElseThrow(() -> new ModelNotFoundException("모델을 찾을 수 없습니다: " + modelId));
+
+        return AIModelDetailResponse.from(model);
     }
 
     /**
