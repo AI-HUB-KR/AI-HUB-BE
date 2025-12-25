@@ -69,6 +69,7 @@ class AdminAIModelControllerTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         AIModelResponse response = AIModelResponse.builder()
@@ -105,6 +106,7 @@ class AdminAIModelControllerTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         given(adminAIModelService.createModel(any(CreateAIModelRequest.class)))
@@ -127,6 +129,7 @@ class AdminAIModelControllerTest {
                 "Updated description",
                 BigDecimal.valueOf(0.04),
                 BigDecimal.valueOf(0.08),
+                BigDecimal.ZERO,
                 false);
 
         AIModelResponse response = AIModelResponse.builder()
@@ -160,6 +163,7 @@ class AdminAIModelControllerTest {
         Integer modelId = 999;
         UpdateAIModelRequest request = new UpdateAIModelRequest(
                 "GPT-4 Updated",
+                null,
                 null,
                 null,
                 null,

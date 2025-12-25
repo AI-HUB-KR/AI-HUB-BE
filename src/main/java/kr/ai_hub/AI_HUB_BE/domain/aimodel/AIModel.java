@@ -43,8 +43,9 @@ public class AIModel {
     /**
      * 모델 마크업 비율 (예: 0.2는 20% 마크업)
      */
+    @Builder.Default
     @Column(name = "model_markup_rate", precision = 5, scale = 4, nullable = false)
-    private BigDecimal modelMarkupRate;
+    private BigDecimal modelMarkupRate = BigDecimal.ZERO;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
@@ -86,7 +87,8 @@ public class AIModel {
      * @return BigDecimal 입력 토큰 1백만 단위당 가격에 markup 적용 가격
      */
     public BigDecimal getInputPricePer1m() {
-        BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);
+        BigDecimal markupRate = this.modelMarkupRate != null ? this.modelMarkupRate : BigDecimal.ZERO;
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(markupRate);
         return this.inputPricePer1m.multiply(markupMultiplier);
     }
 
@@ -95,7 +97,8 @@ public class AIModel {
      * @return BigDecimal 출력 토큰 1백만 단위당 가격에 markup 적용 가격
      */
     public BigDecimal getOutputPricePer1m() {
-        BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);
+        BigDecimal markupRate = this.modelMarkupRate != null ? this.modelMarkupRate : BigDecimal.ZERO;
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(markupRate);
         return this.outputPricePer1m.multiply(markupMultiplier);
     }
 
