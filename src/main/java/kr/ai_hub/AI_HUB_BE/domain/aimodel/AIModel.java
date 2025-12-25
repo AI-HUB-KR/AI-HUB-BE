@@ -40,7 +40,9 @@ public class AIModel {
 
     @Column(name = "output_price_per_1m", precision = 20, scale = 10, nullable = false)
     private BigDecimal outputPricePer1m;
-
+    /**
+     * 모델 마크업 비율 (예: 0.2는 20% 마크업)
+     */
     @Column(name = "model_markup_rate", precision = 5, scale = 4, nullable = false)
     private BigDecimal modelMarkupRate;
 
@@ -78,7 +80,7 @@ public class AIModel {
 
     /**
      * 입력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
-     * @return
+     * @return BigDecimal 입력 토큰 1백만 단위당 가격에 markup 적용 가격
      */
     public BigDecimal getInputPricePer1m() {
         BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);
@@ -87,7 +89,7 @@ public class AIModel {
 
     /**
      * 출력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
-     * @return
+     * @return BigDecimal 출력 토큰 1백만 단위당 가격에 markup 적용 가격
      */
     public BigDecimal getOutputPricePer1m() {
         BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);

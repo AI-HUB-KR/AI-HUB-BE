@@ -27,6 +27,10 @@ public record CreateAIModelRequest(
         @DecimalMin(value = "0.0", message = "출력 가격은 0 이상이어야 합니다")
         BigDecimal outputPricePer1m,
 
+        @NotNull(message = "모델 마크업 비율은 필수입니다")
+        @DecimalMin(value ="0.0", inclusive = true, message = "모델 마크업 비율은 0 이상이어야 합니다")
+        BigDecimal modelMarkupRate,
+
         @NotNull(message = "활성화 여부는 필수입니다")
         Boolean isActive
 ) {}
