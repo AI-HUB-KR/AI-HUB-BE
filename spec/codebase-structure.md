@@ -311,9 +311,12 @@ Repository:  domain/aimodel/AIModelRepository.java (공유)
 DTOs:
   - application/admin/dto/CreateAIModelRequest.java
   - application/admin/dto/UpdateAIModelRequest.java
+  - application/aimodel/dto/AIModelResponse.java
+  - application/aimodel/dto/AIModelDetailResponse.java
 
 API Endpoints:
   - POST   /api/v1/admin/models           # 모델 생성 (관리자)
+  - GET    /api/v1/admin/models/{modelId}     # 모델 상세 조회 (관리자)
   - PUT    /api/v1/admin/models/{modelId}     # 모델 수정 (관리자)
   - DELETE /api/v1/admin/models/{modelId}     # 모델 삭제 (관리자)
 ```

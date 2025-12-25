@@ -987,6 +987,48 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 }
 ```
 
+#### [관리자] AI 모델 상세 조회
+- **Method**: GET `/api/v1/admin/models/{modelId}`
+- **인증**: 필수 (ADMIN)
+
+**성공 응답 (200)**: `AIModelDetailResponse`
+```json
+{
+  "success": true,
+  "detail": {
+    "modelId": 1,
+    "modelName": "gpt-4",
+    "displayName": "GPT-4",
+    "displayExplain": "설명",
+    "inputPricePer1m": 0.02,
+    "outputPricePer1m": 0.04,
+    "modelMarkupRate": 0.2,
+    "isActive": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (AIModelDetailResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail.modelId` | integer | 모델 ID |
+| `detail.modelName` | string | 내부 모델 식별자 |
+| `detail.displayName` | string | 표시 이름 |
+| `detail.displayExplain` | string | 설명 |
+| `detail.inputPricePer1m` | number | 입력 1M 토큰당 원가 |
+| `detail.outputPricePer1m` | number | 출력 1M 토큰당 원가 |
+| `detail.modelMarkupRate` | number | 마크업 비율 |
+| `detail.isActive` | boolean | 활성화 여부 |
+| `detail.createdAt` | string | 생성 시각 (ISO 8601) |
+| `detail.updatedAt` | string | 수정 시각 (ISO 8601) |
+
+**비고**
+- `inputPricePer1m`, `outputPricePer1m`는 마크업 적용 전 원가입니다.
+- 마크업 적용 가격은 `원가 * (1 + modelMarkupRate)`입니다.
+
 #### [관리자] AI 모델 수정
 - **Method**: PUT `/api/v1/admin/models/{modelId}`
 - **인증**: 필수 (ADMIN)
