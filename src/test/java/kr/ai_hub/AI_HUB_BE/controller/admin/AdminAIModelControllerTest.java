@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.ai_hub.AI_HUB_BE.application.admin.AdminAIModelService;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.UpdateAIModelRequest;
+import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelDetailResponse;
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtAuthenticationFilter;
@@ -69,6 +70,7 @@ class AdminAIModelControllerTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         AIModelResponse response = AIModelResponse.builder()
@@ -105,6 +107,7 @@ class AdminAIModelControllerTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         given(adminAIModelService.createModel(any(CreateAIModelRequest.class)))
@@ -127,6 +130,7 @@ class AdminAIModelControllerTest {
                 "Updated description",
                 BigDecimal.valueOf(0.04),
                 BigDecimal.valueOf(0.08),
+                BigDecimal.ZERO,
                 false);
 
         AIModelResponse response = AIModelResponse.builder()
@@ -163,6 +167,7 @@ class AdminAIModelControllerTest {
                 null,
                 null,
                 null,
+                null,
                 null);
 
         given(adminAIModelService.updateModel(eq(modelId), any(UpdateAIModelRequest.class)))
@@ -172,6 +177,49 @@ class AdminAIModelControllerTest {
         mockMvc.perform(put("/api/v1/admin/models/{modelId}", modelId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("AI 모델 상세 조회 - 성공")
+    void getModelDetails_Success() throws Exception {
+        // given
+        Integer modelId = 1;
+        AIModelDetailResponse response = AIModelDetailResponse.builder()
+                .modelId(modelId)
+                .modelName("gpt-4")
+                .displayName("GPT-4")
+                .displayExplain("Advanced AI model")
+                .inputPricePer1m(new BigDecimal("0.0200000000"))
+                .outputPricePer1m(new BigDecimal("0.0400000000"))
+                .modelMarkupRate(new BigDecimal("0.2"))
+                .isActive(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        given(adminAIModelService.getModelDetails(modelId)).willReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/admin/models/{modelId}", modelId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detail.modelId").value(modelId))
+                .andExpect(jsonPath("$.detail.modelMarkupRate").value(0.2))
+                .andExpect(jsonPath("$.detail.inputPricePer1m").exists())
+                .andExpect(jsonPath("$.detail.outputPricePer1m").exists());
+    }
+
+    @Test
+    @DisplayName("AI 모델 상세 조회 - 모델 없음")
+    void getModelDetails_ModelNotFound() throws Exception {
+        // given
+        Integer modelId = 999;
+
+        given(adminAIModelService.getModelDetails(modelId))
+                .willThrow(new ModelNotFoundException("모델을 찾을 수 없습니다"));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/admin/models/{modelId}", modelId))
                 .andExpect(status().isNotFound());
     }
 

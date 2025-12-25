@@ -21,5 +21,8 @@ public record UpdateAIModelRequest(
         @DecimalMin(value = "0.0", message = "출력 가격은 0 이상이어야 합니다")
         BigDecimal outputPricePer1m,
 
+        @DecimalMin(value ="0.0", inclusive = true, message = "모델 마크업 비율은 0 이상이어야 합니다")
+        BigDecimal modelMarkupRate,
+
         Boolean isActive
 ) {}

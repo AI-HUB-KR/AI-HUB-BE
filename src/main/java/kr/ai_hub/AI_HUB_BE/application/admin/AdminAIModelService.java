@@ -2,6 +2,7 @@ package kr.ai_hub.AI_HUB_BE.application.admin;
 
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.UpdateAIModelRequest;
+import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelDetailResponse;
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
@@ -26,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminAIModelService {
 
     private final AIModelRepository aiModelRepository;
-    private final UserRepository userRepository;
-    private final SecurityContextHelper securityContextHelper;
 
     /**
      * 새로운 AI 모델을 등록합니다 (관리자 전용).
@@ -35,7 +34,6 @@ public class AdminAIModelService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse createModel(CreateAIModelRequest request) {
-        //validateAdminRole();
         log.info("관리자 모델 생성 요청: modelName={}", request.modelName());
 
         // 모델명 중복 체크
@@ -49,6 +47,7 @@ public class AdminAIModelService {
                 .displayExplain(request.displayExplain())
                 .inputPricePer1m(request.inputPricePer1m())
                 .outputPricePer1m(request.outputPricePer1m())
+                .modelMarkupRate(request.modelMarkupRate())
                 .isActive(request.isActive())
                 .build();
 
@@ -59,12 +58,24 @@ public class AdminAIModelService {
     }
 
     /**
+     * AI 모델 토큰 원가와 markup를 포함한 상세 정보를 조회합니다 (관리자 전용).
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    public AIModelDetailResponse getModelDetails(Integer modelId) {
+        log.info("관리자 모델 상세 조회 요청: modelId={}", modelId);
+
+        AIModel model = aiModelRepository.findById(modelId)
+                .orElseThrow(() -> new ModelNotFoundException("모델을 찾을 수 없습니다: " + modelId));
+
+        return AIModelDetailResponse.from(model);
+    }
+
+    /**
      * AI 모델 정보를 수정합니다 (관리자 전용).
      */
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public AIModelResponse updateModel(Integer modelId, UpdateAIModelRequest request) {
-        //validateAdminRole();
         log.info("관리자 모델 수정 요청: modelId={}", modelId);
 
         AIModel model = aiModelRepository.findById(modelId)
@@ -75,6 +86,7 @@ public class AdminAIModelService {
                 request.displayExplain(),
                 request.inputPricePer1m(),
                 request.outputPricePer1m(),
+                request.modelMarkupRate(),
                 request.isActive()
         );
 
@@ -89,7 +101,6 @@ public class AdminAIModelService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteModel(Integer modelId) {
-        //validateAdminRole();
         log.info("관리자 모델 삭제(deactivate) 요청: modelId={}", modelId);
 
         aiModelRepository

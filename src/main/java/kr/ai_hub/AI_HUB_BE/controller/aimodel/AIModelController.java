@@ -25,7 +25,6 @@ public class AIModelController {
 
     /**
      * 활성화된 AI 모델 목록 조회
-     * GET /api/v1/models
      */
     @Operation(summary = "활성화된 AI 모델 목록 조회")
     @GetMapping

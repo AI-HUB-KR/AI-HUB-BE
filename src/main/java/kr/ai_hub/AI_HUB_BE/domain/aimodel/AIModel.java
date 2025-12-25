@@ -40,6 +40,12 @@ public class AIModel {
 
     @Column(name = "output_price_per_1m", precision = 20, scale = 10, nullable = false)
     private BigDecimal outputPricePer1m;
+    /**
+     * 모델 마크업 비율 (예: 0.2는 20% 마크업)
+     */
+    @Builder.Default
+    @Column(name = "model_markup_rate", precision = 5, scale = 4, nullable = false)
+    private BigDecimal modelMarkupRate = BigDecimal.ZERO;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
@@ -55,7 +61,7 @@ public class AIModel {
 
     public void update(String displayName, String displayExplain,
                        BigDecimal inputPricePer1m, BigDecimal outputPricePer1m,
-                       Boolean isActive) {
+                       BigDecimal modelMarkupRate,Boolean isActive) {
         if (displayName != null) {
             this.displayName = displayName;
         }
@@ -68,9 +74,32 @@ public class AIModel {
         if (outputPricePer1m != null) {
             this.outputPricePer1m = outputPricePer1m;
         }
+        if (modelMarkupRate != null) {
+            this.modelMarkupRate = modelMarkupRate;
+        }
         if (isActive != null) {
             this.isActive = isActive;
         }
+    }
+
+    /**
+     * 입력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
+     * @return BigDecimal 입력 토큰 1백만 단위당 가격에 markup 적용 가격
+     */
+    public BigDecimal getInputPricePer1m() {
+        BigDecimal markupRate = this.modelMarkupRate != null ? this.modelMarkupRate : BigDecimal.ZERO;
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(markupRate);
+        return this.inputPricePer1m.multiply(markupMultiplier);
+    }
+
+    /**
+     * 출력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
+     * @return BigDecimal 출력 토큰 1백만 단위당 가격에 markup 적용 가격
+     */
+    public BigDecimal getOutputPricePer1m() {
+        BigDecimal markupRate = this.modelMarkupRate != null ? this.modelMarkupRate : BigDecimal.ZERO;
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(markupRate);
+        return this.outputPricePer1m.multiply(markupMultiplier);
     }
 
     public void deactivate() {

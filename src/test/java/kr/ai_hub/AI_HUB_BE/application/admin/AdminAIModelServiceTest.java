@@ -2,6 +2,7 @@ package kr.ai_hub.AI_HUB_BE.application.admin;
 
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.CreateAIModelRequest;
 import kr.ai_hub.AI_HUB_BE.application.admin.dto.UpdateAIModelRequest;
+import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelDetailResponse;
 import kr.ai_hub.AI_HUB_BE.application.aimodel.dto.AIModelResponse;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModel;
 import kr.ai_hub.AI_HUB_BE.domain.aimodel.AIModelRepository;
@@ -51,6 +52,7 @@ class AdminAIModelServiceTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         AIModel savedModel = AIModel.builder()
@@ -98,6 +100,7 @@ class AdminAIModelServiceTest {
                 "Advanced AI model",
                 BigDecimal.valueOf(0.03),
                 BigDecimal.valueOf(0.06),
+                BigDecimal.ZERO,
                 true);
 
         AIModel existingModel = AIModel.builder()
@@ -123,6 +126,7 @@ class AdminAIModelServiceTest {
                 "Updated description",
                 BigDecimal.valueOf(0.04),
                 BigDecimal.valueOf(0.08),
+                BigDecimal.ZERO,
                 false);
 
         AIModel existingModel = AIModel.builder()
@@ -167,12 +171,71 @@ class AdminAIModelServiceTest {
                 null,
                 null,
                 null,
+                null,
                 null);
 
         given(aiModelRepository.findById(modelId)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> adminAIModelService.updateModel(modelId, request))
+                .isInstanceOf(ModelNotFoundException.class)
+                .hasMessageContaining("모델을 찾을 수 없습니다");
+    }
+
+    @Test
+    @DisplayName("AI 모델 상세 조회 - 성공")
+    void getModelDetails_Success() {
+        // given
+        Integer modelId = 1;
+        BigDecimal markupRate = BigDecimal.valueOf(0.2);
+        BigDecimal inputCost = BigDecimal.valueOf(0.02);
+        BigDecimal outputCost = BigDecimal.valueOf(0.04);
+
+        AIModel model = AIModel.builder()
+                .modelId(modelId)
+                .modelName("gpt-4")
+                .displayName("GPT-4")
+                .displayExplain("Advanced AI model")
+                .inputPricePer1m(inputCost)
+                .outputPricePer1m(outputCost)
+                .modelMarkupRate(markupRate)
+                .isActive(true)
+                .build();
+
+        try {
+            java.lang.reflect.Field createdAtField = AIModel.class.getDeclaredField("createdAt");
+            createdAtField.setAccessible(true);
+            createdAtField.set(model, LocalDateTime.now());
+
+            java.lang.reflect.Field updatedAtField = AIModel.class.getDeclaredField("updatedAt");
+            updatedAtField.setAccessible(true);
+            updatedAtField.set(model, LocalDateTime.now());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        given(aiModelRepository.findById(modelId)).willReturn(Optional.of(model));
+
+        // when
+        AIModelDetailResponse result = adminAIModelService.getModelDetails(modelId);
+
+        // then
+        assertThat(result.modelId()).isEqualTo(modelId);
+        assertThat(result.inputPricePer1m()).isEqualByComparingTo(inputCost);
+        assertThat(result.outputPricePer1m()).isEqualByComparingTo(outputCost);
+        assertThat(result.modelMarkupRate()).isEqualByComparingTo(markupRate);
+    }
+
+    @Test
+    @DisplayName("AI 모델 상세 조회 - 모델 없음")
+    void getModelDetails_ModelNotFound() {
+        // given
+        Integer modelId = 999;
+
+        given(aiModelRepository.findById(modelId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> adminAIModelService.getModelDetails(modelId))
                 .isInstanceOf(ModelNotFoundException.class)
                 .hasMessageContaining("모델을 찾을 수 없습니다");
     }
