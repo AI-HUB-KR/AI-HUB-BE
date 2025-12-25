@@ -41,6 +41,9 @@ public class AIModel {
     @Column(name = "output_price_per_1m", precision = 20, scale = 10, nullable = false)
     private BigDecimal outputPricePer1m;
 
+    @Column(name = "model_markup_rate", precision = 5, scale = 4, nullable = false)
+    private BigDecimal modelMarkupRate;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
@@ -71,6 +74,24 @@ public class AIModel {
         if (isActive != null) {
             this.isActive = isActive;
         }
+    }
+
+    /**
+     * 입력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
+     * @return
+     */
+    public BigDecimal getInputPricePer1m() {
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);
+        return this.inputPricePer1m.multiply(markupMultiplier);
+    }
+
+    /**
+     * 출력 토큰 1백만 단위당 가격에 markup 적용 가격을 반환합니다.
+     * @return
+     */
+    public BigDecimal getOutputPricePer1m() {
+        BigDecimal markupMultiplier = BigDecimal.ONE.add(this.modelMarkupRate);
+        return this.outputPricePer1m.multiply(markupMultiplier);
     }
 
     public void deactivate() {
