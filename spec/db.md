@@ -97,6 +97,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `display_explain` (VARCHAR(100)): 모델 설명
   - `input_price_per_1m` (DECIMAL(20,10)): 입력 1m 토큰당 가격
   - `output_price_per_1m` (DECIMAL(20,10)): 출력 1m 토큰당 가격
+  - `model_markup_rate` (DECIMAL(5,4)): 모델 마크업 비율 (예: 0.2 = 20%)
   - `is_active` (BOOLEAN): 활성화 상태
   - `created_at`, `updated_at` (TIMESTAMP): 생성/수정 시간
 

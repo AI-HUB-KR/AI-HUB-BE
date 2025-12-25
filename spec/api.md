@@ -589,6 +589,9 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 | `detail[].createdAt` | string | 생성 시각 (ISO 8601) |
 | `detail[].updatedAt` | string | 수정 시각 (ISO 8601) |
 
+**비고**
+- `inputPricePer1m`, `outputPricePer1m`는 `modelMarkupRate`가 반영된 가격입니다.
+
 ---
 
 ### 5. 지갑 (UserWallet)
@@ -785,6 +788,9 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 | `detail[].outputPricePer1m` | number | 출력 1M 토큰당 가격 |
 | `detail[].isActive` | boolean | 활성화 여부 |
 
+**비고**
+- `inputPricePer1m`, `outputPricePer1m`는 `modelMarkupRate`가 반영된 가격입니다.
+
 #### 월별 사용량 조회
 - **Method**: GET `/api/v1/dashboard/usage/monthly`
 - **인증**: 필수
@@ -947,6 +953,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
   "displayExplain": "설명",
   "inputPricePer1m": 0.01,
   "outputPricePer1m": 0.03,
+  "modelMarkupRate": 0.2,
   "isActive": true
 }
 ```
@@ -958,6 +965,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 | `displayName` | 최대 30자 |
 | `displayExplain` | 최대 200자 |
 | `inputPricePer1m` / `outputPricePer1m` | 0 이상 |
+| `modelMarkupRate` | 0 이상 |
 | `isActive` | 필수 |
 
 **성공 응답 (201)**: `AIModelResponse`
@@ -991,6 +999,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
   "displayExplain": "새 설명",
   "inputPricePer1m": 0.02,
   "outputPricePer1m": 0.05,
+  "modelMarkupRate": 0.1,
   "isActive": true
 }
 ```
