@@ -236,6 +236,36 @@
       }
     },
     "/api/v1/admin/models/{modelId}": {
+      "get": {
+        "tags": [
+          "AI 모델 관리 (관리자)"
+        ],
+        "summary": "AI 모델 토큰 원가와 markup를 포함한 상세 조회",
+        "operationId": "getModelDetails",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAIModelDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "AI 모델 관리 (관리자)"
@@ -1105,6 +1135,10 @@
             "type": "number",
             "minimum": 0.0
           },
+          "modelMarkupRate": {
+            "type": "number",
+            "minimum": 0.0
+          },
           "isActive": {
             "type": "boolean"
           }
@@ -1304,6 +1338,10 @@
             "type": "number",
             "minimum": 0.0
           },
+          "modelMarkupRate": {
+            "type": "number",
+            "minimum": 0.0
+          },
           "isActive": {
             "type": "boolean"
           }
@@ -1312,6 +1350,7 @@
           "displayName",
           "inputPricePer1m",
           "isActive",
+          "modelMarkupRate",
           "modelName",
           "outputPricePer1m"
         ]
@@ -2095,6 +2134,59 @@
           },
           "empty": {
             "type": "boolean"
+          }
+        }
+      },
+      "AIModelDetailResponse": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "modelName": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "displayExplain": {
+            "type": "string"
+          },
+          "inputPricePer1m": {
+            "type": "number"
+          },
+          "outputPricePer1m": {
+            "type": "number"
+          },
+          "modelMarkupRate": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseAIModelDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/AIModelDetailResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
