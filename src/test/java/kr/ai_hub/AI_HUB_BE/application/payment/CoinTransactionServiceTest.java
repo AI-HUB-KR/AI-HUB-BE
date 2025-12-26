@@ -57,7 +57,7 @@ class CoinTransactionServiceTest {
 
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .amount(BigDecimal.valueOf(100))
+                .coinUsage(BigDecimal.valueOf(100))
                 .balanceAfter(BigDecimal.valueOf(100))
                 .transactionType("CHARGE")
                 .description("Test")
@@ -97,7 +97,7 @@ class CoinTransactionServiceTest {
 
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .amount(BigDecimal.valueOf(100))
+                .coinUsage(BigDecimal.valueOf(100))
                 .balanceAfter(BigDecimal.valueOf(100))
                 .transactionType("CHARGE")
                 .description("Test")
@@ -141,7 +141,7 @@ class CoinTransactionServiceTest {
 
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .amount(BigDecimal.valueOf(100))
+                .coinUsage(BigDecimal.valueOf(100))
                 .balanceAfter(BigDecimal.valueOf(100))
                 .transactionType("CHARGE")
                 .description("Test")
@@ -187,7 +187,7 @@ class CoinTransactionServiceTest {
 
         CoinTransaction transaction = CoinTransaction.builder()
                 .user(user)
-                .amount(BigDecimal.valueOf(-50))
+                .coinUsage(BigDecimal.valueOf(-50))
                 .balanceAfter(BigDecimal.valueOf(50))
                 .transactionType("USAGE")
                 .description("Test")

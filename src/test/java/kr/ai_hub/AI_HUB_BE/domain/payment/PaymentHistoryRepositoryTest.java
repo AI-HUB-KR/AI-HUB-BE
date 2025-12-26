@@ -46,8 +46,8 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId(transactionId)
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("completed")
                 .build();
         paymentHistoryRepository.save(paymentHistory);
@@ -74,15 +74,15 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId("tx-1")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .build();
         PaymentHistory payment2 = PaymentHistory.builder()
                 .user(user)
                 .transactionId("tx-2")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(20000))
-                .coinAmount(BigDecimal.valueOf(200))
+                .payAmountKrw(BigDecimal.valueOf(20000))
+                .paidCoin(BigDecimal.valueOf(200))
                 .build();
         paymentHistoryRepository.saveAll(List.of(payment1, payment2));
 
@@ -107,8 +107,8 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId("tx-old")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .build();
         paymentHistoryRepository.save(payment1);
 
@@ -123,8 +123,8 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId("tx-new")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(20000))
-                .coinAmount(BigDecimal.valueOf(200))
+                .payAmountKrw(BigDecimal.valueOf(20000))
+                .paidCoin(BigDecimal.valueOf(200))
                 .build();
         paymentHistoryRepository.save(payment2);
 
@@ -152,16 +152,16 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId("tx-pending")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("pending")
                 .build();
         PaymentHistory completed = PaymentHistory.builder()
                 .user(user)
                 .transactionId("tx-completed")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("completed")
                 .build();
         paymentHistoryRepository.saveAll(List.of(pending, completed));
@@ -188,8 +188,8 @@ class PaymentHistoryRepositoryTest {
                 .user(user)
                 .transactionId("tx-time")
                 .paymentMethod("CARD")
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .build();
         paymentHistoryRepository.save(payment);
 
@@ -219,8 +219,8 @@ class PaymentHistoryRepositoryTest {
                     .user(user)
                     .transactionId("tx-" + i)
                     .paymentMethod("CARD")
-                    .amountKrw(BigDecimal.valueOf(1000))
-                    .coinAmount(BigDecimal.valueOf(10))
+                    .payAmountKrw(BigDecimal.valueOf(1000))
+                    .paidCoin(BigDecimal.valueOf(10))
                     .build());
         }
 
