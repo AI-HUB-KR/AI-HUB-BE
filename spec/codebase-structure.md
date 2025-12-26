@@ -87,7 +87,7 @@ controller/
 ├── dashboard/DashboardController.java           # 대시보드 통계 API
 ├── payment/
 │   ├── CoinTransactionController.java           # 코인 거래 내역 API
-│   └── PaymentHistoryController.java            # 결제 내역 API
+│   └── WalletHistoryController.java            # 지갑 이력 API
 └── user/
     ├── UserController.java                      # 사용자 정보 API
     └── UserWalletController.java                # 지갑 조회 API
@@ -158,7 +158,7 @@ application/
 │       └── UserStatsResponse.java
 ├── payment/
 │   ├── CoinTransactionService.java              # 코인 거래 내역 서비스
-│   ├── PaymentHistoryService.java               # 결제 내역 서비스
+│   ├── WalletHistoryService.java               # 지갑 이력 서비스
 │   └── dto/
 │       ├── CoinTransactionResponse.java
 │       └── PaymentResponse.java
@@ -201,8 +201,8 @@ domain/
 ├── payment/
 │   ├── CoinTransaction.java                     # 코인 거래 엔티티
 │   ├── CoinTransactionRepository.java
-│   ├── PaymentHistory.java               # 결제 내역 엔티티
-│   └── PaymentHistoryRepository.java
+│   ├── WalletHistory.java               # 지갑 이력 엔티티
+│   └── WalletHistoryRepository.java
 └── user/
     ├── User.java                                # 사용자 엔티티 (Soft Delete)
     ├── UserRepository.java
@@ -372,13 +372,13 @@ API Endpoints:
 
 ### Payment (결제 및 코인)
 ```
-Controller:  controller/payment/PaymentHistoryController.java
+Controller:  controller/payment/WalletHistoryController.java
              controller/payment/CoinTransactionController.java
-Service:     application/payment/PaymentHistoryService.java
+Service:     application/payment/WalletHistoryService.java
              application/payment/CoinTransactionService.java
-Entity:      domain/payment/PaymentHistory.java
+Entity:      domain/payment/WalletHistory.java
              domain/payment/CoinTransaction.java
-Repository:  domain/payment/PaymentHistoryRepository.java
+Repository:  domain/payment/WalletHistoryRepository.java
              domain/payment/CoinTransactionRepository.java
 DTOs:
   - application/payment/dto/PaymentResponse.java
@@ -386,7 +386,7 @@ DTOs:
 
 API Endpoints:
   - GET /api/v1/payments              # 결제 목록 (status 필터)
-  - GET /api/v1/payments/{paymentId} # 결제 상세
+  - GET /api/v1/payments/{paymentId} # 지갑 이력 상세
   - GET /api/v1/transactions  # 거래 내역 (type, date 필터)
 ```
 

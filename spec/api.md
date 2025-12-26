@@ -178,7 +178,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 | `ROOM_NOT_FOUND` | 채팅방을 찾을 수 없습니다 |
 | `MESSAGE_NOT_FOUND` | 메시지를 찾을 수 없습니다 |
 | `MODEL_NOT_FOUND` | AI 모델을 찾을 수 없습니다 |
-| `PAYMENT_NOT_FOUND` | 결제 내역을 찾을 수 없습니다 |
+| `WALLET_HISTORY_NOT_FOUND` | 지갑 이력을 찾을 수 없습니다 |
 | `PAYMENT_FAILED` | 결제에 실패했습니다 |
 | `TRANSACTION_NOT_FOUND` | 거래 내역을 찾을 수 없습니다 |
 | `SYSTEM_ILLEGAL_STATE` | 시스템 상태가 유효하지 않습니다 |
@@ -658,9 +658,9 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 
 ---
 
-### 6. 결제 내역 (PaymentHistory)
+### 6. 지갑 이력 (WalletHistory)
 
-#### 결제 내역 목록 조회
+#### 지갑 이력 목록 조회
 - **Method**: GET `/api/v1/payments`
 - **인증**: 필수
 
@@ -671,12 +671,12 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 | `page` | 0 | 0부터 시작 |
 | `size` | 20 | 페이지 크기 |
 
-**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다. 각 `content[]` 항목은 `PaymentResponse`입니다.
+**성공 응답 (200)**: `detail`은 Spring Data `Page` 직렬화 형태입니다. 각 `content[]` 항목은 `WalletHistoryResponse`입니다.
 
-**content[] 필드 (PaymentResponse)**
+**content[] 필드 (WalletHistoryResponse)**
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `detail.content[].paymentId` | integer | 결제 ID |
+| `detail.content[].historyId` | integer | 지갑 이력 ID |
 | `detail.content[].transactionId` | string | 트랜잭션 ID |
 | `detail.content[].paymentMethod` | string | 결제 수단 |
 | `detail.content[].amountKrw` | number | 결제 금액(KRW) |
@@ -689,16 +689,16 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 | `detail.content[].createdAt` | string | 생성 시각 (ISO 8601) |
 | `detail.content[].completedAt` | string | 완료 시각 (없으면 `null`) |
 
-#### 결제 상세 조회
+#### 지갑 이력 상세 조회
 - **Method**: GET `/api/v1/payments/{paymentId}`
 - **인증**: 필수
 
-**성공 응답 (200)** (`PaymentResponse`)
+**성공 응답 (200)** (`WalletHistoryResponse`)
 ```json
 {
   "success": true,
   "detail": {
-    "paymentId": 1,
+    "historyId": 1,
     "transactionId": "tx_123",
     "paymentMethod": "card",
     "amountKrw": 10000.0,
@@ -716,7 +716,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 ```
 
 **오류 예시**
-- **404** `PAYMENT_NOT_FOUND`
+- **404** `WALLET_HISTORY_NOT_FOUND`
 - **403** `FORBIDDEN`
 
 ---
@@ -989,7 +989,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 #### [관리자] 사용자 프로모션 코인 수정
 - **Method**: PATCH `/api/v1/admin/wallet`
 - **인증**: 필수 (ADMIN)
-- **설명**: 관리자가 사용자의 프로모션 코인을 증감합니다. 변경 이력은 PaymentHistory(wallet_history)에 자동으로 기록됩니다.
+- **설명**: 관리자가 사용자의 프로모션 코인을 증감합니다. 변경 이력은 WalletHistory(wallet_history)에 자동으로 기록됩니다.
 
 **요청 본문**
 ```json
@@ -1007,7 +1007,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 
 **비고**
 - 프로모션 코인이 0 미만으로 내려갈 수 없습니다.
-- 변경 이력은 자동으로 `PaymentHistory` 테이블에 기록됩니다.
+- 변경 이력은 자동으로 `WalletHistory` 테이블에 기록됩니다.
 
 **성공 응답 (200)** (본문은 `detail: null`)
 ```json

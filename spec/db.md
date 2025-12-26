@@ -125,14 +125,14 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - 모든 잔액 변경 시 `last_transaction_at` 자동 업데이트
 - **관계**: User와 1:1 관계
 
-#### 8. PaymentHistory (결제 내역 / 지갑 변동 이력)
-- **테이블명**: `payment_history`
+#### 8. WalletHistory (결제 내역 / 지갑 변동 이력)
+- **테이블명**: `wallet_history`
 - **용도**:
   - 결제를 통한 유상 코인 충전 이력 기록
   - 관리자의 프로모션 코인 지급/회수 이력 기록
   - 모든 지갑 잔액 변동 사항의 추적 가능한 이력 관리
 - **주요 필드**:
-  - `payment_id` (BIGINT, PK): 결제 고유 ID
+  - `history_id` (BIGINT, PK): 결제 고유 ID
   - `user_id` (INT, FK): 사용자 ID
   - `transaction_id` (VARCHAR(100)): 거래 ID (유니크)
     - 결제: 결제 게이트웨이 제공 ID
@@ -178,7 +178,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **비고**:
   - `balance_after`는 해당 거래 당시의 잔액 스냅샷으로, 현재 최신 잔액을 나타내지 않음
   - 메시지 전송 시 코인 차감과 동시에 이력이 기록됨
-  - PaymentHistory와 달리 코인 사용(차감) 이력만 기록
+  - WalletHistory와 달리 코인 사용(차감) 이력만 기록
 - **관계**:
   - User와 N:1 관계
   - ChatRoom과 N:1 관계 (nullable)
@@ -188,7 +188,7 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 ### Enum 타입 정의
 
 #### WalletHistoryType (지갑 이력 타입)
-지갑 잔액 변동 이력의 타입을 구분하는 Enum입니다. PaymentHistory 테이블의 `wallet_history_type` 필드에서 사용됩니다.
+지갑 잔액 변동 이력의 타입을 구분하는 Enum입니다. WalletHistory 테이블의 `wallet_history_type` 필드에서 사용됩니다.
 
 - **PAID**: 유상 코인 지급 (결제를 통한 코인 충전)
 - **PROMOTION**: 프로모션 코인 지급 (관리자가 사용자에게 무상 지급)
@@ -209,9 +209,9 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **이중 잔액 관리**: UserWallet은 `paid_balance`(유상 코인)와 `promotion_balance`(프로모션 코인)를 분리 관리
 - **코인 사용 우선순위**: 프로모션 코인을 먼저 차감한 후 유상 코인 차감 (UserWallet.deductBalance 메서드)
 - **이력 추적**:
-  - PaymentHistory: 코인 충전/지급/회수 이력 (잔액 증가/감소 모두 포함)
+  - WalletHistory: 코인 충전/지급/회수 이력 (잔액 증가/감소 모두 포함)
   - CoinTransaction: 코인 사용(차감) 이력만 기록
 - **연관 관계/삭제 정책**:
   - User ↔ UserWallet: 1:1 (JPA: `cascade = ALL`, `orphanRemoval = true`)
   - 그 외 관계는 기본적으로 cascade 설정 없음 (DB의 ON DELETE 동작은 스키마/마이그레이션에 따름)
-- **JSONB 지원**: PaymentHistory의 metadata 필드는 유연한 데이터 저장을 위해 JSONB 타입 사용
+- **JSONB 지원**: WalletHistory의 metadata 필드는 유연한 데이터 저장을 위해 JSONB 타입 사용
