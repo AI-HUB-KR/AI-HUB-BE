@@ -70,6 +70,10 @@ public class User {
         this.email = email;
     }
 
+    public void updateRole(UserRole role) {
+        this.role = role;
+    }
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private UserWallet wallet;
 

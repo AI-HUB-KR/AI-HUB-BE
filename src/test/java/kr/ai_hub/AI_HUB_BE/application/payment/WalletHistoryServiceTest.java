@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.payment;
 
 import kr.ai_hub.AI_HUB_BE.application.payment.dto.PaymentResponse;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistory;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistoryRepository;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
@@ -32,13 +32,13 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class PaymentHistoryServiceTest {
+class WalletHistoryServiceTest {
 
     @InjectMocks
-    private PaymentHistoryService paymentHistoryService;
+    private WalletHistoryService walletHistoryService;
 
     @Mock
-    private PaymentHistoryRepository paymentHistoryRepository;
+    private WalletHistoryRepository walletHistoryRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -54,29 +54,29 @@ class PaymentHistoryServiceTest {
         User user = User.builder().build();
         Pageable pageable = PageRequest.of(0, 10);
 
-        PaymentHistory payment = PaymentHistory.builder()
-                .paymentId(1L)
+        WalletHistory history = WalletHistory.builder()
+                .historyId(1L)
                 .user(user)
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("COMPLETED")
                 .paymentMethod("CARD")
                 .transactionId("tx_123")
                 .createdAt(java.time.LocalDateTime.now())
                 .build();
-        Page<PaymentHistory> paymentPage = new PageImpl<>(List.of(payment));
+        Page<WalletHistory> historyPage = new PageImpl<>(List.of(history));
 
         given(securityContextHelper.getCurrentUserId()).willReturn(userId);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(paymentHistoryRepository.findByUser(user, pageable)).willReturn(paymentPage);
+        given(walletHistoryRepository.findByUser(user, pageable)).willReturn(historyPage);
 
         // when
-        Page<PaymentResponse> result = paymentHistoryService.getPayments(null, pageable);
+        Page<PaymentResponse> result = walletHistoryService.getPayments(null, pageable);
 
         // then
         assertThat(result.getContent()).hasSize(1);
-        assertThat(result.getContent().get(0).paymentId()).isEqualTo(1L);
-        verify(paymentHistoryRepository).findByUser(user, pageable);
+        assertThat(result.getContent().get(0).historyId()).isEqualTo(1L);
+        verify(walletHistoryRepository).findByUser(user, pageable);
     }
 
     @Test
@@ -88,29 +88,29 @@ class PaymentHistoryServiceTest {
         String status = "COMPLETED";
         Pageable pageable = PageRequest.of(0, 10);
 
-        PaymentHistory payment = PaymentHistory.builder()
-                .paymentId(1L)
+        WalletHistory history = WalletHistory.builder()
+                .historyId(1L)
                 .user(user)
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("COMPLETED")
                 .paymentMethod("CARD")
                 .transactionId("tx_123")
                 .createdAt(java.time.LocalDateTime.now())
                 .build();
-        Page<PaymentHistory> paymentPage = new PageImpl<>(List.of(payment));
+        Page<WalletHistory> historyPage = new PageImpl<>(List.of(history));
 
         given(securityContextHelper.getCurrentUserId()).willReturn(userId);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(paymentHistoryRepository.findByUserAndStatus(user, status, pageable)).willReturn(paymentPage);
+        given(walletHistoryRepository.findByUserAndStatus(user, status, pageable)).willReturn(historyPage);
 
         // when
-        Page<PaymentResponse> result = paymentHistoryService.getPayments(status, pageable);
+        Page<PaymentResponse> result = walletHistoryService.getPayments(status, pageable);
 
         // then
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).status()).isEqualTo("COMPLETED");
-        verify(paymentHistoryRepository).findByUserAndStatus(user, status, pageable);
+        verify(walletHistoryRepository).findByUserAndStatus(user, status, pageable);
     }
 
     @Test
@@ -124,7 +124,7 @@ class PaymentHistoryServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> paymentHistoryService.getPayments(null, pageable))
+        assertThatThrownBy(() -> walletHistoryService.getPayments(null, pageable))
                 .isInstanceOf(UserNotFoundException.class);
     }
 
@@ -133,7 +133,7 @@ class PaymentHistoryServiceTest {
     void getPayment_Success() {
         // given
         Integer userId = 1;
-        Long paymentId = 1L;
+        Long historyId = 1L;
 
         User user = User.builder().build();
         try {
@@ -144,11 +144,11 @@ class PaymentHistoryServiceTest {
             throw new RuntimeException(e);
         }
 
-        PaymentHistory payment = PaymentHistory.builder()
-                .paymentId(paymentId)
+        WalletHistory history = WalletHistory.builder()
+                .historyId(historyId)
                 .user(user)
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("COMPLETED")
                 .paymentMethod("CARD")
                 .transactionId("tx_123")
@@ -156,13 +156,13 @@ class PaymentHistoryServiceTest {
                 .build();
 
         given(securityContextHelper.getCurrentUserId()).willReturn(userId);
-        given(paymentHistoryRepository.findById(paymentId)).willReturn(Optional.of(payment));
+        given(walletHistoryRepository.findById(historyId)).willReturn(Optional.of(history));
 
         // when
-        PaymentResponse result = paymentHistoryService.getPayment(paymentId);
+        PaymentResponse result = walletHistoryService.getPayment(historyId);
 
         // then
-        assertThat(result.paymentId()).isEqualTo(paymentId);
+        assertThat(result.historyId()).isEqualTo(historyId);
     }
 
     @Test
@@ -170,13 +170,13 @@ class PaymentHistoryServiceTest {
     void getPayment_NotFound() {
         // given
         Integer userId = 1;
-        Long paymentId = 1L;
+        Long historyId = 1L;
 
         given(securityContextHelper.getCurrentUserId()).willReturn(userId);
-        given(paymentHistoryRepository.findById(paymentId)).willReturn(Optional.empty());
+        given(walletHistoryRepository.findById(historyId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> paymentHistoryService.getPayment(paymentId))
+        assertThatThrownBy(() -> walletHistoryService.getPayment(historyId))
                 .isInstanceOf(PaymentNotFoundException.class);
     }
 
@@ -186,7 +186,7 @@ class PaymentHistoryServiceTest {
         // given
         Integer userId = 1;
         Integer otherUserId = 2;
-        Long paymentId = 1L;
+        Long historyId = 1L;
 
         User otherUser = User.builder().build();
         try {
@@ -197,11 +197,11 @@ class PaymentHistoryServiceTest {
             throw new RuntimeException(e);
         }
 
-        PaymentHistory payment = PaymentHistory.builder()
-                .paymentId(paymentId)
+        WalletHistory history = WalletHistory.builder()
+                .historyId(historyId)
                 .user(otherUser)
-                .amountKrw(BigDecimal.valueOf(10000))
-                .coinAmount(BigDecimal.valueOf(100))
+                .payAmountKrw(BigDecimal.valueOf(10000))
+                .paidCoin(BigDecimal.valueOf(100))
                 .status("COMPLETED")
                 .paymentMethod("CARD")
                 .transactionId("tx_123")
@@ -209,10 +209,10 @@ class PaymentHistoryServiceTest {
                 .build();
 
         given(securityContextHelper.getCurrentUserId()).willReturn(userId);
-        given(paymentHistoryRepository.findById(paymentId)).willReturn(Optional.of(payment));
+        given(walletHistoryRepository.findById(historyId)).willReturn(Optional.of(history));
 
         // when & then
-        assertThatThrownBy(() -> paymentHistoryService.getPayment(paymentId))
+        assertThatThrownBy(() -> walletHistoryService.getPayment(historyId))
                 .isInstanceOf(ForbiddenException.class);
     }
 }

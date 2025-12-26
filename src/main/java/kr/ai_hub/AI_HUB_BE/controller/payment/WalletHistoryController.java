@@ -2,7 +2,7 @@ package kr.ai_hub.AI_HUB_BE.controller.payment;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import kr.ai_hub.AI_HUB_BE.application.payment.PaymentHistoryService;
+import kr.ai_hub.AI_HUB_BE.application.payment.WalletHistoryService;
 import kr.ai_hub.AI_HUB_BE.application.payment.dto.PaymentResponse;
 import kr.ai_hub.AI_HUB_BE.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
-public class PaymentHistoryController {
+public class WalletHistoryController {
 
-    private final PaymentHistoryService paymentHistoryService;
+    private final WalletHistoryService walletHistoryService;
 
     /**
      * 현재 사용자의 결제 내역을 페이지네이션하여 조회합니다.
@@ -35,7 +35,7 @@ public class PaymentHistoryController {
         log.info("결제 내역 조회 API 호출: status={}, page={}, size={}", status, page, size);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<PaymentResponse> response = paymentHistoryService.getPayments(status, pageable);
+        Page<PaymentResponse> response = walletHistoryService.getPayments(status, pageable);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -48,7 +48,7 @@ public class PaymentHistoryController {
     public ResponseEntity<ApiResponse<PaymentResponse>> getPayment(@PathVariable Long paymentId) {
         log.info("결제 상세 조회 API 호출: paymentId={}", paymentId);
 
-        PaymentResponse response = paymentHistoryService.getPayment(paymentId);
+        PaymentResponse response = walletHistoryService.getPayment(paymentId);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

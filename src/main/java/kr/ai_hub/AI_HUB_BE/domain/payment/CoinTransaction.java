@@ -46,9 +46,12 @@ public class CoinTransaction {
     @Column(name = "transaction_type", length = 20, nullable = false)
     private String transactionType;
 
-    @Column(name = "amount", precision = 20, scale = 10, nullable = false)
-    private BigDecimal amount;
+    @Column(name = "coin_usage", precision = 20, scale = 10, nullable = false)
+    private BigDecimal coinUsage;
 
+    /**
+     * Coin Transaction 당시의 거래 후 잔액(유저 최신 잔액 아님).
+     */
     @Column(name = "balance_after", precision = 20, scale = 10, nullable = false)
     private BigDecimal balanceAfter;
 

@@ -45,6 +45,8 @@ public class UserWalletService {
 
         return BalanceResponse.builder()
                 .balance(wallet.getBalance())
+                .paidBalance(wallet.getPaidBalance())
+                .promotionBalance(wallet.getPromotionBalance())
                 .build();
     }
 }

@@ -14,7 +14,7 @@ import java.time.ZoneOffset;
 public record CoinTransactionResponse(
         Long transactionId,
         String transactionType,
-        BigDecimal amount,
+        BigDecimal coinUsage,
         BigDecimal balanceAfter,
         String description,
         Integer modelId,
@@ -27,7 +27,7 @@ public record CoinTransactionResponse(
         return CoinTransactionResponse.builder()
                 .transactionId(transaction.getTransactionId())
                 .transactionType(transaction.getTransactionType())
-                .amount(transaction.getAmount())
+                .coinUsage(transaction.getCoinUsage())
                 .balanceAfter(transaction.getBalanceAfter())
                 .description(transaction.getDescription())
                 .modelId(transaction.getAiModel() != null ? transaction.getAiModel().getModelId() : null)

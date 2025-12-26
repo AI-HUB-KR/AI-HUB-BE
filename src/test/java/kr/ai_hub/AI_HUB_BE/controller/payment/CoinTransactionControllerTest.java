@@ -63,7 +63,7 @@ class CoinTransactionControllerTest {
         // given
         CoinTransactionResponse transaction = CoinTransactionResponse.builder()
                 .transactionId(1L)
-                .amount(BigDecimal.valueOf(100))
+                .coinUsage(BigDecimal.valueOf(100))
                 .balanceAfter(BigDecimal.valueOf(100))
                 .transactionType("CHARGE")
                 .description("Test")
@@ -90,7 +90,7 @@ class CoinTransactionControllerTest {
         // given
         CoinTransactionResponse transaction = CoinTransactionResponse.builder()
                 .transactionId(1L)
-                .amount(BigDecimal.valueOf(-50))
+                .coinUsage(BigDecimal.valueOf(-50))
                 .balanceAfter(BigDecimal.valueOf(50))
                 .transactionType("USAGE")
                 .description("Test")
@@ -116,7 +116,7 @@ class CoinTransactionControllerTest {
         // given
         CoinTransactionResponse transaction = CoinTransactionResponse.builder()
                 .transactionId(1L)
-                .amount(BigDecimal.valueOf(100))
+                .coinUsage(BigDecimal.valueOf(100))
                 .balanceAfter(BigDecimal.valueOf(100))
                 .transactionType("CHARGE")
                 .description("Test")
@@ -143,7 +143,7 @@ class CoinTransactionControllerTest {
         // given
         CoinTransactionResponse transaction = CoinTransactionResponse.builder()
                 .transactionId(1L)
-                .amount(BigDecimal.valueOf(-50))
+                .coinUsage(BigDecimal.valueOf(-50))
                 .balanceAfter(BigDecimal.valueOf(50))
                 .transactionType("USAGE")
                 .description("Test")

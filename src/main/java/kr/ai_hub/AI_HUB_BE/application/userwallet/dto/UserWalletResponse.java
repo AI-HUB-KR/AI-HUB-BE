@@ -15,6 +15,8 @@ public record UserWalletResponse(
         Integer walletId,
         Integer userId,
         BigDecimal balance,
+        BigDecimal paidBalance,
+        BigDecimal promotionBalance,
         BigDecimal totalPurchased,
         BigDecimal totalUsed,
         Instant lastTransactionAt,
@@ -26,6 +28,8 @@ public record UserWalletResponse(
                 .walletId(wallet.getWalletId())
                 .userId(wallet.getUser().getUserId())
                 .balance(wallet.getBalance())
+                .paidBalance(wallet.getPaidBalance())
+                .promotionBalance(wallet.getPromotionBalance())
                 .totalPurchased(wallet.getTotalPurchased())
                 .totalUsed(wallet.getTotalUsed())
                 .lastTransactionAt(wallet.getLastTransactionAt() != null ?

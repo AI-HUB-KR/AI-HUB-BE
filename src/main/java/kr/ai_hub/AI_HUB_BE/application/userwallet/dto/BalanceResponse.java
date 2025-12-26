@@ -9,5 +9,7 @@ import java.math.BigDecimal;
  */
 @Builder
 public record BalanceResponse(
-        BigDecimal balance
+        BigDecimal balance,
+        BigDecimal paidBalance,
+        BigDecimal promotionBalance
 ) {}

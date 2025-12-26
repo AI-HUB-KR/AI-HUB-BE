@@ -98,6 +98,10 @@ class MessageTransactionServiceTest {
         UserWallet wallet = UserWallet.builder()
                 .user(user)
                 .balance(BigDecimal.valueOf(1000))
+                .paidBalance(BigDecimal.valueOf(1000))
+                .promotionBalance(BigDecimal.ZERO)
+                .totalPurchased(BigDecimal.ZERO)
+                .totalUsed(BigDecimal.ZERO)
                 .build();
 
         AiUsage usage = new AiUsage(1000, 500, 1500); // input 1000, output 500

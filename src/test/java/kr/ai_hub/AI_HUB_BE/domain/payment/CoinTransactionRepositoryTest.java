@@ -51,7 +51,7 @@ class CoinTransactionRepositoryTest {
 
                 CoinTransaction tx1 = CoinTransaction.builder()
                                 .user(user)
-                                .amount(BigDecimal.valueOf(10))
+                                .coinUsage(BigDecimal.valueOf(10))
                                 .balanceAfter(BigDecimal.valueOf(10))
                                 .transactionType("CHARGE")
                                 .description("Test Transaction 1")
@@ -60,7 +60,7 @@ class CoinTransactionRepositoryTest {
 
                 CoinTransaction tx2 = CoinTransaction.builder()
                                 .user(user)
-                                .amount(BigDecimal.valueOf(20))
+                                .coinUsage(BigDecimal.valueOf(20))
                                 .balanceAfter(BigDecimal.valueOf(30))
                                 .transactionType("USAGE")
                                 .description("Test Transaction 2")
@@ -93,7 +93,7 @@ class CoinTransactionRepositoryTest {
                 CoinTransaction tx1 = CoinTransaction.builder()
                                 .user(user)
                                 .chatRoom(chatRoom)
-                                .amount(BigDecimal.valueOf(10))
+                                .coinUsage(BigDecimal.valueOf(10))
                                 .balanceAfter(BigDecimal.valueOf(10))
                                 .transactionType("USAGE")
                                 .description("Test Transaction 1")
@@ -121,13 +121,13 @@ class CoinTransactionRepositoryTest {
                 CoinTransaction charge = CoinTransaction.builder()
                                 .user(user)
                                 .transactionType("CHARGE")
-                                .amount(BigDecimal.valueOf(100))
+                                .coinUsage(BigDecimal.valueOf(100))
                                 .balanceAfter(BigDecimal.valueOf(100))
                                 .build();
                 CoinTransaction usage = CoinTransaction.builder()
                                 .user(user)
                                 .transactionType("USAGE")
-                                .amount(BigDecimal.valueOf(-50))
+                                .coinUsage(BigDecimal.valueOf(-50))
                                 .balanceAfter(BigDecimal.valueOf(50))
                                 .build();
                 coinTransactionRepository.saveAll(List.of(charge, usage));
@@ -153,7 +153,7 @@ class CoinTransactionRepositoryTest {
                 CoinTransaction tx = CoinTransaction.builder()
                                 .user(user)
                                 .transactionType("CHARGE")
-                                .amount(BigDecimal.valueOf(100))
+                                .coinUsage(BigDecimal.valueOf(100))
                                 .balanceAfter(BigDecimal.valueOf(100))
                                 .build();
                 coinTransactionRepository.save(tx);
@@ -183,7 +183,7 @@ class CoinTransactionRepositoryTest {
                         coinTransactionRepository.save(CoinTransaction.builder()
                                         .user(user)
                                         .transactionType("CHARGE")
-                                        .amount(BigDecimal.valueOf(10))
+                                        .coinUsage(BigDecimal.valueOf(10))
                                         .balanceAfter(BigDecimal.valueOf((i + 1) * 10))
                                         .build());
                 }
