@@ -46,7 +46,7 @@ src/main/java/kr/ai_hub/AI_HUB_BE/
 7. **dashboard** - 통계 및 대시보드
 8. **global** - 공통 모듈 (config, error, common 등)
 
-## 2. 최종 확정된 도메인 기반 구조 ✅
+## 2. 최종 확정된 도메인 기반 구조치 ✅
 
 ### 도메인 구조
 ```

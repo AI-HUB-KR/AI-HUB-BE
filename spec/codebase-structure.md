@@ -2,7 +2,9 @@
 
 > 이 문서는 코드베이스 탐색 시 빠르게 필요한 파일을 찾을 수 있도록 작성된 구조 가이드입니다.
 >
-> 마지막 업데이트: 2025-12-18
+> 마지막 업데이트: 2025-12-26
+>
+> **주요 변경사항**: 레이어 기반 구조에서 도메인 기반 구조로 마이그레이션 완료
 
 ---
 
@@ -22,8 +24,8 @@
 
 **프로젝트명**: AI-HUB-BE
 **기술 스택**: Spring Boot 3.5.6, Java 25, JPA/Hibernate, PostgreSQL
-**아키텍처**: Layered Architecture (계층형 아키텍처)
-**패키지 전략**: Package by Feature (도메인별 패키지 구조)
+**아키텍처**: Domain-Driven Design (도메인 중심 아키텍처)
+**패키지 전략**: Package by Feature - 도메인별 계층화 구조 (Domain/{controller|service|domain|dto})
 
 ### 통계
 - **전체 Java 파일**: 123개
@@ -37,204 +39,233 @@
 
 ## 🏗 아키텍처 패턴
 
+### 도메인 중심 구조 (Domain-Based Architecture)
 ```
-┌─────────────────────────────────────────┐
-│         Controller Layer                │  ← HTTP 요청/응답 처리
-│    (Presentation / API Endpoints)       │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│        Application Layer                │  ← 비즈니스 로직, 트랜잭션
-│     (Service + DTO + Use Cases)         │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│          Domain Layer                   │  ← 엔티티, 리포지토리
-│     (Entity + Repository + Enum)        │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│          Infrastructure                 │  ← 데이터베이스
-│        (PostgreSQL / H2)                │
-└─────────────────────────────────────────┘
+src/main/java/kr/ai_hub/AI_HUB_BE/
+├── {domain}/                     ← 도메인별 독립적인 패키지
+│   ├── controller/               ← HTTP 요청/응답 처리 (Presentation)
+│   ├── service/                  ← 비즈니스 로직, 트랜잭션 (Application)
+│   ├── domain/                   ← 엔티티, 리포지토리 (Domain)
+│   └── dto/                      ← 데이터 전송 객체
+└── global/                       ← 전역 공통 모듈
+    ├── config/                   ← 설정
+    ├── security/                 ← 보안, 인증
+    ├── common/                   ← 공통 유틸
+    └── error/                    ← 에러 처리
+
+7개 주요 도메인: user, aimodel, auth, wallet, chat, admin, dashboard
+```
+
+### 도메인 내부 계층 구조 (각 도메인별로 동일)
+```
+{domain}/
+├── controller/     ← Presentation Layer
+│   └── *Controller.java
+├── service/        ← Application Layer
+│   └── *Service.java
+├── domain/         ← Domain Layer
+│   ├── *.java      (Entity)
+│   └── *Repository.java
+└── dto/            ← Data Transfer Objects
+    ├── *Request.java
+    └── *Response.java
 ```
 
 ### 레이어 간 의존성 규칙
 - Controller → Service (O)
 - Service → Repository (O)
+- Service → 다른 도메인의 Service (O) - 예: UserWalletService → UserService
 - Repository → Entity (O)
 - **역방향 의존성 금지** (하위 레이어가 상위 레이어 참조 X)
+- **도메인 격리 원칙**: 각 도메인은 독립적이며, 필요시 Service 레이어를 통해 상호작용
 
 ---
 
-## 📁 레이어별 구조
+## 📁 도메인별 구조
 
-### 1. Controller Layer
-**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/controller/`
+### 1. User 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/user/`
 
 ```
-controller/
-├── admin/
-│   ├── AdminAIModelController.java      # 관리자 AI 모델 관리 API
-│   └── AdminWalletModifyController.java # 관리자 지갑 잔액 수정 API
-├── aimodel/AIModelController.java               # AI 모델 조회 API
-├── auth/
+user/
+├── controller/
+│   └── UserController.java                      # 사용자 정보 API
+├── service/
+│   └── UserService.java                         # 사용자 정보 서비스
+├── domain/
+│   ├── User.java                                # 사용자 엔티티
+│   ├── UserRepository.java
+│   └── UserRole.java                            # Enum: ROLE_USER, ROLE_ADMIN
+└── dto/
+    ├── UpdateUserRequest.java
+    └── UserResponse.java
+```
+
+### 2. AI Model 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/aimodel/`
+
+```
+aimodel/
+├── controller/
+│   └── AIModelController.java                   # AI 모델 조회 API
+├── service/
+│   └── AIModelService.java                      # AI 모델 조회 서비스
+├── domain/
+│   ├── AIModel.java                             # AI 모델 엔티티
+│   └── AIModelRepository.java
+└── dto/
+    ├── AIModelResponse.java
+    └── AIModelDetailResponse.java
+```
+
+### 3. Auth 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/auth/`
+
+```
+auth/
+├── controller/
 │   ├── AuthController.java                      # OAuth2 로그인 API
 │   └── TokenController.java                     # 토큰 갱신 API
-├── chat/
-│   ├── ChatRoomController.java                  # 채팅방 CRUD API
-│   └── ChatMessageController.java               # 메시지 조회 API
-├── dashboard/DashboardController.java           # 대시보드 통계 API
-├── payment/
-│   ├── CoinTransactionController.java           # 코인 거래 내역 API
-│   └── WalletHistoryController.java            # 지갑 이력 API
-└── user/
-    ├── UserController.java                      # 사용자 정보 API
-    └── UserWalletController.java                # 지갑 조회 API
-```
-
-**역할**: HTTP 요청 처리, 입력 검증(@Valid), 응답 변환(ApiResponse)
-
----
-
-### 2. Application Layer
-**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/application/`
-
-```
-application/
-├── admin/
-│   ├── AdminAIModelService.java                 # 관리자 AI 모델 서비스
-│   ├── AdminWalletModifyService.java            # 관리자 지갑 잔액 수정 서비스
-│   └── dto/
-│       ├── CreateAIModelRequest.java
-│       └── UpdateAIModelRequest.java
-├── aimodel/
-│   ├── AIModelService.java                      # AI 모델 조회 서비스
-│   └── dto/AIModelResponse.java
-├── auth/
+├── service/
 │   ├── CustomOAuth2UserService.java             # OAuth2 사용자 서비스
 │   ├── TokenHashService.java                    # 토큰 해싱 서비스
-│   ├── accesstoken/AccessTokenService.java
-│   ├── refreshtoken/RefreshTokenService.java
-│   └── dto/
-│       ├── RefreshedTokens.java
-│       └── TokenRefreshResponse.java
-├── chat/
-│   ├── chatroom/
-│   │   ├── ChatRoomService.java                 # 채팅방 CRUD 서비스
-│   │   └── dto/
-│   │       ├── ChatRoomListItemResponse.java
-│   │       ├── ChatRoomResponse.java
-│   │       ├── CreateChatRoomRequest.java
-│   │       └── UpdateChatRoomRequest.java
-│   └── message/
-│       ├── AiSseHandler.java                    # AI 서버 SSE 스트리밍 핸들러
-│       ├── FileValidationService.java           # 파일 검증
-│       ├── FileUploadService.java               # AI 서버 파일 업로드
-│       ├── MessageRequestBuilder.java           # AI 요청 바디 빌더
-│       ├── MessageTransactionService.java       # 메시지 저장/정산 트랜잭션
-│       ├── MessageService.java                  # 메시지 조회/전송(스트리밍) 오케스트레이션
-│       └── dto/
-│           ├── MessageListItemResponse.java
-│           ├── MessageResponse.java
-│           ├── FileUploadResponse.java              # 파일 업로드 응답
-│           ├── SendMessageRequest.java              # 메시지 전송 요청
-│           ├── ChatHistoryMessage.java              # AI 요청용 히스토리 DTO
-│           ├── FileType.java                        # 파일 타입(image/document/audio)
-│           ├── AiServerResponse.java                # AI 서버 응답 래퍼
-│           ├── AiUploadData.java                    # AI 업로드 응답 데이터
-│           ├── AiChatData.java                      # AI 채팅 응답 데이터
-│           ├── AiUsage.java                         # 토큰 사용량 정보
-│           ├── AiStreamingResult.java               # 스트리밍 최종 결과
-│           └── SseEvent.java                        # SSE 이벤트 파싱 DTO
-├── dashboard/
-│   ├── DashboardService.java                    # 대시보드 통계 서비스
-│   └── dto/
-│       ├── DailyUsageDetail.java
-│       ├── ModelPricingResponse.java
-│       ├── ModelUsageDetail.java
-│       ├── MonthlyUsageResponse.java
-│       ├── MostUsedModel.java
-│       └── UserStatsResponse.java
-├── payment/
-│   ├── CoinTransactionService.java              # 코인 거래 내역 서비스
-│   ├── WalletHistoryService.java               # 지갑 이력 서비스
-│   └── dto/
-│       ├── CoinTransactionResponse.java
-│       └── PaymentResponse.java
-├── user/
-│   ├── UserService.java                         # 사용자 정보 서비스
-│   └── dto/
-│       ├── UpdateUserRequest.java
-│       └── UserResponse.java
-└── userwallet/
-    ├── UserWalletService.java                   # 사용자 지갑 서비스
-    └── dto/
-        ├── BalanceResponse.java
-        └── UserWalletResponse.java
-```
-
-**역할**: 비즈니스 로직, 트랜잭션 관리(@Transactional), DTO 변환
-
----
-
-### 3. Domain Layer
-**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/domain/`
-
-```
-domain/
-├── aimodel/
-│   ├── AIModel.java                 # AI 모델 엔티티
-│   └── AIModelRepository.java
-├── auth/
-│   ├── AccessToken.java
+│   ├── AccessTokenService.java                  # Access Token 서비스
+│   └── RefreshTokenService.java                 # Refresh Token 서비스
+├── domain/
+│   ├── AccessToken.java                         # Access Token 엔티티
 │   ├── AccessTokenRepository.java
-│   ├── RefreshToken.java
+│   ├── RefreshToken.java                        # Refresh Token 엔티티
 │   ├── RefreshTokenRepository.java
-│   └── TokenRevokeReason.java
-├── chat/
+│   └── TokenRevokeReason.java                   # Token 폐기 이유 Enum
+└── dto/
+    ├── RefreshedTokens.java
+    └── TokenRefreshResponse.java
+```
+
+### 4. Wallet 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/wallet/`
+
+```
+wallet/
+├── controller/
+│   ├── UserWalletController.java                # 사용자 지갑 API
+│   ├── CoinTransactionController.java           # 코인 거래 내역 API
+│   └── WalletHistoryController.java             # 지갑 이력 API
+├── service/
+│   ├── UserWalletService.java                   # 사용자 지갑 서비스
+│   ├── CoinTransactionService.java              # 코인 거래 내역 서비스
+│   └── WalletHistoryService.java                # 지갑 이력 서비스
+├── domain/
+│   ├── UserWallet.java                          # 사용자 지갑 엔티티
+│   ├── UserWalletRepository.java
+│   ├── CoinTransaction.java                     # 코인 거래 엔티티
+│   ├── CoinTransactionRepository.java
+│   ├── WalletHistory.java                       # 지갑 이력 엔티티
+│   ├── WalletHistoryRepository.java
+│   └── WalletHistoryType.java                   # 지갑 이력 타입 Enum
+└── dto/
+    ├── UserWalletResponse.java
+    ├── BalanceResponse.java
+    ├── CoinTransactionResponse.java
+    └── WalletHistoryResponse.java
+```
+
+### 5. Chat 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/chat/`
+
+```
+chat/
+├── controller/
+│   ├── ChatRoomController.java                  # 채팅방 CRUD API
+│   └── ChatMessageController.java               # 메시지 조회/전송 API
+├── service/
+│   ├── ChatRoomService.java                     # 채팅방 CRUD 서비스
+│   ├── MessageService.java                      # 메시지 오케스트레이션
+│   ├── MessageTransactionService.java           # 메시지 저장/정산 트랜잭션
+│   ├── AiSseHandler.java                        # AI 서버 SSE 스트리밍
+│   ├── FileValidationService.java               # 파일 검증
+│   ├── FileUploadService.java                   # AI 서버 파일 업로드
+│   └── MessageRequestBuilder.java               # AI 요청 바디 빌더
+├── domain/
 │   ├── ChatRoom.java                            # 채팅방 엔티티 (UUID v7)
 │   ├── ChatRoomRepository.java
 │   ├── Message.java                             # 메시지 엔티티 (UUID v7)
 │   ├── MessageRepository.java
-│   └── MessageRole.java                     # Enum: USER, ASSISTANT
-├── payment/
-│   ├── CoinTransaction.java                     # 코인 거래 엔티티
-│   ├── CoinTransactionRepository.java
-│   ├── WalletHistory.java               # 지갑 이력 엔티티
-│   └── WalletHistoryRepository.java
-└── user/
-    ├── User.java                                # 사용자 엔티티 (Soft Delete)
-    ├── UserRepository.java
-    ├── UserRole.java                        # Enum: ROLE_USER, ROLE_ADMIN
-    ├── UserWallet.java                   # 사용자 지갑 엔티티
-    └── UserWalletRepository.java
+│   └── MessageRole.java                         # Enum: USER, ASSISTANT
+└── dto/
+    ├── CreateChatRoomRequest.java
+    ├── UpdateChatRoomRequest.java
+    ├── ChatRoomResponse.java
+    ├── ChatRoomListItemResponse.java
+    ├── SendMessageRequest.java
+    ├── MessageResponse.java
+    ├── MessageListItemResponse.java
+    ├── FileUploadResponse.java
+    ├── ChatHistoryMessage.java
+    ├── FileType.java
+    ├── AiServerResponse.java
+    ├── AiUploadData.java
+    ├── AiChatData.java
+    ├── AiUsage.java
+    ├── AiStreamingResult.java
+    └── SseEvent.java
 ```
 
-**역할**: 도메인 모델, 데이터베이스 매핑, 비즈니스 규칙 캡슐화
+### 6. Admin 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/admin/`
 
----
+```
+admin/
+├── controller/
+│   ├── AdminAIModelController.java              # 관리자 AI 모델 관리 API
+│   └── AdminUserController.java                 # 관리자 사용자 관리 API
+├── service/
+│   ├── AdminAIModelService.java                 # 관리자 AI 모델 서비스
+│   └── AdminUserService.java                    # 관리자 사용자 서비스
+└── dto/
+    ├── CreateAIModelRequest.java
+    ├── UpdateAIModelRequest.java
+    ├── UpdateUserRoleRequest.java
+    └── AdminWalletModifyRequest.java
+```
 
-### 4. Global Layer
+### 7. Dashboard 도메인
+**위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/dashboard/`
+
+```
+dashboard/
+├── controller/
+│   └── DashboardController.java                 # 대시보드 통계 API
+├── service/
+│   └── DashboardService.java                    # 대시보드 통계 서비스
+└── dto/
+    ├── ModelPricingResponse.java
+    ├── MonthlyUsageResponse.java
+    ├── UserStatsResponse.java
+    ├── ModelUsageDetail.java
+    ├── DailyUsageDetail.java
+    └── MostUsedModel.java
+```
+
+### 8. Global 모듈
 **위치**: `src/main/java/kr/ai_hub/AI_HUB_BE/global/`
 
 ```
 global/
-├── application/
-│   └── CookieService.java                       # 토큰 쿠키 유틸
-├── auth/
+├── security/
+│   ├── SecurityContextHelper.java               # 보안 컨텍스트 헬퍼
 │   ├── CustomAuthenticationSuccessHandler.java  # OAuth2 성공 핸들러
-│   ├── CustomOauth2User.java                    # OAuth2 사용자 Principal
-│   ├── SecurityContextHelper.java               # ✨ 보안 컨텍스트 헬퍼 (공통)
-│   ├── jwt/
-│   │   ├── JwtAuthenticationEntryPoint.java     # JWT 인증 실패 핸들러
-│   │   ├── JwtAuthenticationFilter.java         # JWT 인증 필터
-│   │   └── JwtTokenProvider.java                # JWT 토큰 생성/검증
-│   └── userinfo/
-│       ├── OAuth2UserInfoFactory.java           # OAuth2 유저정보 팩토리
-│       ├── KakaoOAuth2UserInfo.java             # Kakao 유저정보
-│       └── OAuth2UserInfo.java                  # 공통 유저정보 인터페이스
+│   ├── oauth2/
+│   │   ├── CustomOAuth2User.java                # OAuth2 사용자 Principal
+│   │   ├── OAuth2UserInfoFactory.java
+│   │   ├── KakaoOAuth2UserInfo.java
+│   │   └── OAuth2UserInfo.java
+│   └── jwt/
+│       ├── JwtAuthenticationEntryPoint.java     # JWT 인증 실패 핸들러
+│       ├── JwtAuthenticationFilter.java         # JWT 인증 필터
+│       └── JwtTokenProvider.java                # JWT 토큰 생성/검증
 ├── common/
+│   ├── CookieService.java                       # 토큰 쿠키 유틸
 │   └── response/
 │       ├── ApiResponse.java                     # 공통 API 응답 래퍼
 │       └── ErrorResponse.java                   # 공통 에러 응답
@@ -242,13 +273,13 @@ global/
 │   ├── JpaAuditingConfig.java                   # JPA 설정 (Auditing)
 │   ├── OpenApiConfig.java                       # Swagger/OpenAPI 설정
 │   ├── SecurityConfig.java                      # Spring Security 설정
-│   └── RestClientConfig.java                    # RestClient 설정 (AI 서버 통신)
+│   └── RestClientConfig.java                    # RestClient 설정
 └── error/
     ├── ErrorCode.java                           # 에러 코드 Enum
     ├── GlobalExceptionHandler.java              # 전역 예외 핸들러
     └── exception/
         ├── BaseException.java                   # 기본 예외 클래스
-        ├── AIServerException.java               # AI 서버 통신 예외
+        ├── AIServerException.java
         └── ... (도메인별 예외)
 ```
 
@@ -613,12 +644,27 @@ UserResponse response = UserResponse.from(user);
 
 ### 파일 경로 규칙
 ```
-Controller:   controller/{domain}/{Domain}Controller.java
-Service:      application/{domain}/**/*Service.java
-Entity:       domain/{domain}/*.java
-Repository:   domain/{domain}/*Repository.java
-DTO:          application/**/dto/*.java
+Controller:   {domain}/controller/*Controller.java
+Service:      {domain}/service/*Service.java
+Entity:       {domain}/domain/*.java
+Repository:   {domain}/domain/*Repository.java
+DTO:          {domain}/dto/*.java
 Exception:    global/error/exception/*Exception.java
+```
+
+### 도메인 간 의존성 패턴
+```java
+// 예: UserWalletService → UserService (다른 도메인 Service 호출)
+package kr.ai_hub.AI_HUB_BE.wallet.service;
+
+import kr.ai_hub.AI_HUB_BE.user.service.UserService;  // 다른 도메인의 Service
+import kr.ai_hub.AI_HUB_BE.wallet.domain.UserWallet;  // 자신의 도메인 Entity
+
+@Service
+public class UserWalletService {
+    private final UserService userService;  // 의존성 주입
+    // ...
+}
 ```
 
 ---
@@ -632,6 +678,7 @@ Exception:    global/error/exception/*Exception.java
 
 ---
 
-**문서 버전**: 1.1.0
+**문서 버전**: 2.0.0
 **작성자**: Claude Code
-**마지막 업데이트**: 2025-11-23
+**마지막 업데이트**: 2025-12-26
+**주요 변경사항**: 레이어 기반 구조 → 도메인 기반 구조 마이그레이션 완료

@@ -1,6 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.global.error;
 
-import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
+import kr.ai_hub.AI_HUB_BE.global.security.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.AIServerException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.BaseException;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.IllegalSystemStateException;
