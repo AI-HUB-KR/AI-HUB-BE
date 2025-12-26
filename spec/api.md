@@ -908,17 +908,106 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 
 ---
 
-### 9. 관리자 (Admin)
+### 9. 관리자 - 사용자 관리 (Admin User Management)
 
-#### [관리자] 사용자 지갑 잔액 직접 설정
+#### [관리자] 사용자 권한 수정
+- **Method**: PATCH `/api/v1/admin/authority`
+- **인증**: 필수 (ADMIN)
+- **설명**: 관리자가 다른 사용자의 권한을 수정합니다. 본인의 권한은 수정할 수 없습니다.
+
+**요청 본문**
+```json
+{
+  "userId": 2,
+  "role": "ADMIN"
+}
+```
+
+**요청 제약**
+| 필드 | 제약 |
+|---|---|
+| `userId` | 필수, 본인 ID 불가 |
+| `role` | 필수, `USER` 또는 `ADMIN` |
+
+**성공 응답 (200)** (본문은 `detail: null`)
+```json
+{
+  "success": true,
+  "detail": null,
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**오류**
+- **403 Forbidden**: 권한 부족 또는 본인 권한 수정 시도 시 `ErrorResponse` 단독 객체로 응답될 수 있음
+- **404** `USER_NOT_FOUND`
+
+#### [관리자] 전체 사용자 정보 조회
+- **Method**: GET `/api/v1/admin/users`
+- **인증**: 필수 (ADMIN)
+- **설명**: 모든 사용자의 기본 정보와 지갑 정보를 조회합니다.
+
+**성공 응답 (200)**
+```json
+{
+  "success": true,
+  "detail": [
+    {
+      "userId": 1,
+      "username": "홍길동",
+      "role": "USER",
+      "email": "user@example.com",
+      "walletId": 1,
+      "balance": 100.5,
+      "paidBalance": 90.0,
+      "promotionBalance": 10.5,
+      "totalPurchased": 200.0,
+      "totalUsed": 99.5
+    }
+  ],
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+**응답 필드 (UserListResponse)**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `detail[].userId` | integer | 사용자 ID |
+| `detail[].username` | string | 사용자 이름 |
+| `detail[].role` | string | 사용자 권한 (`USER`, `ADMIN`) |
+| `detail[].email` | string | 이메일 |
+| `detail[].walletId` | integer | 지갑 ID (없으면 `null`) |
+| `detail[].balance` | number | 총 잔액 |
+| `detail[].paidBalance` | number | 유료 코인 잔액 |
+| `detail[].promotionBalance` | number | 프로모션 코인 잔액 |
+| `detail[].totalPurchased` | number | 누적 구매(충전) |
+| `detail[].totalUsed` | number | 누적 사용 |
+
+**오류**
+- **403 Forbidden**: 권한 부족 시 `ErrorResponse` 단독 객체로 응답될 수 있음
+
+#### [관리자] 사용자 프로모션 코인 수정
 - **Method**: PATCH `/api/v1/admin/wallet`
 - **인증**: 필수 (ADMIN)
+- **설명**: 관리자가 사용자의 프로모션 코인을 증감합니다. 변경 이력은 PaymentHistory(wallet_history)에 자동으로 기록됩니다.
 
-**쿼리 파라미터**
-| 파라미터 | 타입 | 설명 |
-|---|---|---|
-| `userId` | integer | 대상 사용자 ID |
-| `amount` | integer | 설정할 최종 잔액(코인) |
+**요청 본문**
+```json
+{
+  "userId": 2,
+  "promotionBalance": 50.0
+}
+```
+
+**요청 제약**
+| 필드 | 제약 |
+|---|---|
+| `userId` | 필수 |
+| `promotionBalance` | 필수, 양수는 증가, 음수는 감소 |
+
+**비고**
+- 프로모션 코인이 0 미만으로 내려갈 수 없습니다.
+- 변경 이력은 자동으로 `PaymentHistory` 테이블에 기록됩니다.
 
 **성공 응답 (200)** (본문은 `detail: null`)
 ```json
@@ -932,6 +1021,7 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
 **오류**
 - **403 Forbidden**: 권한 부족 시 `ErrorResponse` 단독 객체로 응답될 수 있음
 - **404** `WALLET_NOT_FOUND`
+- **400** `VALIDATION_ERROR`: 프로모션 코인이 0 미만으로 내려가는 경우
 
 **403 응답 예시 (ErrorResponse 단독)**
 ```json
@@ -940,6 +1030,10 @@ await fetchEventSource(`/api/v1/messages/send/${roomId}`, {
   "message": "접근 권한이 없습니다"
 }
 ```
+
+---
+
+### 10. 관리자 - AI 모델 관리 (Admin Model Management)
 
 #### [관리자] AI 모델 등록
 - **Method**: POST `/api/v1/admin/models`

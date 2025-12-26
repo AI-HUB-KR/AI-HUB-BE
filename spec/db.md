@@ -17,6 +17,8 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
   - `is_deleted` (BOOLEAN): 삭제 상태 (소프트 삭제)
   - `created_at` (TIMESTAMP): 생성 시간
   - `deleted_at` (TIMESTAMP): 삭제 시간
+- **비고**:
+  - 도메인 메서드: `updateRole(UserRole role)` - 사용자 권한 수정 (관리자 기능)
 
 #### 2. ChatRoom (채팅방)
 - **테이블명**: `chat_room`
@@ -106,54 +108,109 @@ AI HUB 플랫폼은 다음 9개의 주요 엔티티로 구성됩니다:
 - **주요 필드**:
   - `wallet_id` (INT, PK): 지갑 고유 ID
   - `user_id` (INT, FK, UNIQUE): 사용자 ID (유니크)
-  - `balance` (DECIMAL(20,10)): 잔액
+  - `balance` (DECIMAL(20,10)): 총 잔액 (paid_balance + promotion_balance)
+  - `paid_balance` (DECIMAL(20,10)): 유상 코인 잔액 (결제로 충전된 코인)
+  - `promotion_balance` (DECIMAL(20,10)): 프로모션 코인 잔액 (관리자가 지급한 무상 코인)
   - `total_purchased` (DECIMAL(20,10)): 총 구매 금액
   - `total_used` (DECIMAL(20,10)): 총 사용 금액
   - `last_transaction_at` (TIMESTAMP): 마지막 거래 시간
   - `created_at`, `updated_at` (TIMESTAMP): 생성/수정 시간
+- **비고**:
+  - 도메인 메서드:
+    - `addPaidBalance(BigDecimal amount)` - 유상 코인 증가 (결제 시)
+    - `addPromotionBalance(BigDecimal amount)` - 프로모션 코인 증가 (관리자 지급)
+    - `deductPromotionBalance(BigDecimal amount)` - 프로모션 코인 감소 (관리자 회수, 잔액 부족 시 예외)
+    - `deductBalance(BigDecimal amount)` - 코인 사용 (프로모션 코인 선차감 후 유상 코인 차감)
+  - 코인 사용 우선순위: 프로모션 코인 → 유상 코인 순으로 차감
+  - 모든 잔액 변경 시 `last_transaction_at` 자동 업데이트
 - **관계**: User와 1:1 관계
 
-#### 8. PaymentHistory (결제 내역)
+#### 8. PaymentHistory (결제 내역 / 지갑 변동 이력)
 - **테이블명**: `payment_history`
+- **용도**:
+  - 결제를 통한 유상 코인 충전 이력 기록
+  - 관리자의 프로모션 코인 지급/회수 이력 기록
+  - 모든 지갑 잔액 변동 사항의 추적 가능한 이력 관리
 - **주요 필드**:
   - `payment_id` (BIGINT, PK): 결제 고유 ID
   - `user_id` (INT, FK): 사용자 ID
   - `transaction_id` (VARCHAR(100)): 거래 ID (유니크)
+    - 결제: 결제 게이트웨이 제공 ID
+    - 관리자 작업: `admin_promo_{UUID}` 형식
   - `payment_method` (VARCHAR(50)): 결제 수단
-  - `amount_krw` (DECIMAL(20,2)): 원화 금액
-  - `amount_usd` (DECIMAL(20,2)): 달러 금액
-  - `coin_amount` (DECIMAL(20,10)): 코인 금액
-  - `bonus_coin` (DECIMAL(20,10)): 보너스 코인
-  - `status` (VARCHAR(20)): 결제 상태 (기본값: 'pending')
+  - `pay_amount_krw` (DECIMAL(20,2)): 원화 결제 금액
+  - `pay_amount_usd` (DECIMAL(20,2)): 달러 결제 금액
+  - `paid_coin` (DECIMAL(20,10)): 유상 코인 금액
+  - `promotion_coin` (DECIMAL(20,10)): 프로모션 코인 금액 (기본값: 0)
+  - `status` (VARCHAR(20)): 처리 상태 (기본값: 'pending')
+  - `wallet_history_type` (VARCHAR(20)): 지갑 이력 타입 (WalletHistoryType Enum)
+    - `PAID`: 유상 코인 지급 (결제)
+    - `PROMOTION`: 프로모션 코인 지급 (관리자)
+    - `PROMOTION_RETRIEVE`: 프로모션 코인 회수 (관리자)
+    - `PAID_RETRIEVE`: 유상 코인 환불 (관리자)
   - `payment_gateway` (VARCHAR(50)): 결제 게이트웨이
   - `metadata` (JSONB): 메타데이터
-  - `created_at`, `completed_at` (TIMESTAMP): 생성/완료 시간
+    - 관리자 작업 시 포함 정보: `adminId`, `userId`, `reason`
+  - `created_at` (TIMESTAMP): 생성 시간
+  - `completed_at` (TIMESTAMP): 완료 시간
+- **비고**:
+  - 도메인 메서드: `complete()`, `fail(String reason)`
+  - 관리자의 모든 프로모션 코인 변경 작업은 이 테이블에 기록됨
+  - `wallet_history_type`으로 이력 타입을 명확히 구분하여 조회 및 통계 생성 용이
 - **관계**: User와 N:1 관계
 
-#### 9. CoinTransaction (코인 거래)
+#### 9. CoinTransaction (코인 거래 / 코인 사용 이력)
 - **테이블명**: `coin_transaction`
+- **용도**:
+  - AI 메시지 생성에 따른 코인 사용 이력 기록
+  - 사용자의 코인 소비 패턴 분석 및 통계 생성
 - **주요 필드**:
   - `transaction_id` (BIGINT, PK): 거래 고유 ID
   - `user_id` (INT, FK): 사용자 ID
-  - `room_id` (UUID, FK): 채팅방 ID (선택)
-  - `message_id` (UUID, FK): 메시지 ID (선택)
-  - `transaction_type` (VARCHAR(20)): 거래 유형
-  - `amount` (DECIMAL(20,10)): 거래 금액
-  - `balance_after` (DECIMAL(20,10)): 거래 후 잔액
-  - `description` (TEXT): 설명
-  - `model_id` (INT, FK): AI 모델 ID
+  - `room_id` (UUID, FK): 채팅방 ID (nullable)
+  - `message_id` (UUID, FK): 메시지 ID (nullable)
+  - `transaction_type` (VARCHAR(20)): 거래 유형 (예: "message_usage")
+  - `coin_usage` (DECIMAL(20,10)): 사용된 코인 금액
+  - `balance_after` (DECIMAL(20,10)): 거래 후 잔액 (스냅샷 - 최신 잔액 아님)
+  - `description` (TEXT): 거래 설명
+  - `model_id` (INT, FK): 사용된 AI 모델 ID (nullable)
   - `created_at` (TIMESTAMP): 생성 시간
+- **비고**:
+  - `balance_after`는 해당 거래 당시의 잔액 스냅샷으로, 현재 최신 잔액을 나타내지 않음
+  - 메시지 전송 시 코인 차감과 동시에 이력이 기록됨
+  - PaymentHistory와 달리 코인 사용(차감) 이력만 기록
 - **관계**:
   - User와 N:1 관계
   - ChatRoom과 N:1 관계 (nullable)
   - Message와 N:1 관계 (nullable)
   - AIModel과 N:1 관계 (nullable)
 
+### Enum 타입 정의
+
+#### WalletHistoryType (지갑 이력 타입)
+지갑 잔액 변동 이력의 타입을 구분하는 Enum입니다. PaymentHistory 테이블의 `wallet_history_type` 필드에서 사용됩니다.
+
+- **PAID**: 유상 코인 지급 (결제를 통한 코인 충전)
+- **PROMOTION**: 프로모션 코인 지급 (관리자가 사용자에게 무상 지급)
+- **PROMOTION_RETRIEVE**: 프로모션 코인 회수 (관리자가 사용자로부터 회수)
+- **PAID_RETRIEVE**: 유상 코인 환불 (관리자가 유상 코인 회수 - 환불 처리)
+
+**활용 방법**:
+- 결제 시스템: `PAID` 타입으로 유상 코인 충전 이력 생성
+- 관리자 프로모션: `PROMOTION` 타입으로 무상 코인 지급 이력 생성
+- 관리자 회수: `PROMOTION_RETRIEVE` 또는 `PAID_RETRIEVE` 타입으로 회수 이력 생성
+- 통계 및 조회: 타입별로 이력을 필터링하여 충전/지급/회수 현황 파악
+
 ### 데이터베이스 설계 특징
 
 - **UUID 사용**: `chat_room`, `message` 엔티티는 UUIDv7을 PK로 사용
 - **Soft Delete**: User 엔티티는 `is_deleted`, `deleted_at` 필드를 통한 소프트 삭제 지원
 - **정밀한 금액 처리**: 코인 관련 필드는 DECIMAL(20,10)로 정밀한 계산 지원
+- **이중 잔액 관리**: UserWallet은 `paid_balance`(유상 코인)와 `promotion_balance`(프로모션 코인)를 분리 관리
+- **코인 사용 우선순위**: 프로모션 코인을 먼저 차감한 후 유상 코인 차감 (UserWallet.deductBalance 메서드)
+- **이력 추적**:
+  - PaymentHistory: 코인 충전/지급/회수 이력 (잔액 증가/감소 모두 포함)
+  - CoinTransaction: 코인 사용(차감) 이력만 기록
 - **연관 관계/삭제 정책**:
   - User ↔ UserWallet: 1:1 (JPA: `cascade = ALL`, `orphanRemoval = true`)
   - 그 외 관계는 기본적으로 cascade 설정 없음 (DB의 ON DELETE 동작은 스키마/마이그레이션에 따름)
