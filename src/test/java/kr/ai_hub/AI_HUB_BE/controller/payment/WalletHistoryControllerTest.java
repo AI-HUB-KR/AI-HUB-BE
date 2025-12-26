@@ -1,7 +1,7 @@
 package kr.ai_hub.AI_HUB_BE.controller.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.ai_hub.AI_HUB_BE.application.payment.PaymentHistoryService;
+import kr.ai_hub.AI_HUB_BE.application.payment.WalletHistoryService;
 import kr.ai_hub.AI_HUB_BE.application.payment.dto.PaymentResponse;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
 import kr.ai_hub.AI_HUB_BE.global.config.SecurityConfig;
@@ -34,7 +34,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = PaymentHistoryController.class, excludeAutoConfiguration = {
+@WebMvcTest(controllers = WalletHistoryController.class, excludeAutoConfiguration = {
         org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
         org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
         org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration.class,
@@ -44,13 +44,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class),
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = SecurityConfig.class)
 })
-class PaymentHistoryControllerTest {
+class WalletHistoryControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
-    private PaymentHistoryService paymentHistoryService;
+    private WalletHistoryService walletHistoryService;
 
     @MockitoBean
     private SecurityContextHelper securityContextHelper;
@@ -80,7 +80,7 @@ class PaymentHistoryControllerTest {
                 null);
         Page<PaymentResponse> paymentPage = new PageImpl<>(List.of(payment));
 
-        given(paymentHistoryService.getPayments(eq(null), any(Pageable.class)))
+        given(walletHistoryService.getPayments(eq(null), any(Pageable.class)))
                 .willReturn(paymentPage);
 
         // when & then
@@ -89,7 +89,7 @@ class PaymentHistoryControllerTest {
                 .param("size", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detail.content").isArray())
-                .andExpect(jsonPath("$.detail.content[0].paymentId").value(1))
+                .andExpect(jsonPath("$.detail.content[0].historyId").value(1))
                 .andExpect(jsonPath("$.detail.content[0].status").value("COMPLETED"));
     }
 
@@ -112,7 +112,7 @@ class PaymentHistoryControllerTest {
                 null);
         Page<PaymentResponse> paymentPage = new PageImpl<>(List.of(payment));
 
-        given(paymentHistoryService.getPayments(eq("COMPLETED"), any(Pageable.class)))
+        given(walletHistoryService.getPayments(eq("COMPLETED"), any(Pageable.class)))
                 .willReturn(paymentPage);
 
         // when & then
@@ -129,9 +129,9 @@ class PaymentHistoryControllerTest {
     @DisplayName("결제 상세 조회 - 성공")
     void getPayment_Success() throws Exception {
         // given
-        Long paymentId = 1L;
+        Long historyId = 1L;
         PaymentResponse payment = new PaymentResponse(
-                paymentId,
+                historyId,
                 "tx_123",
                 "CARD",
                 BigDecimal.valueOf(10000),
@@ -143,13 +143,13 @@ class PaymentHistoryControllerTest {
                 null,
                 Instant.now(),
                 null);
-        given(paymentHistoryService.getPayment(paymentId))
+        given(walletHistoryService.getPayment(historyId))
                 .willReturn(payment);
 
         // when & then
-        mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId))
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", historyId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.detail.paymentId").value(1))
+                .andExpect(jsonPath("$.detail.historyId").value(1))
                 .andExpect(jsonPath("$.detail.transactionId").value("tx_123"))
                 .andExpect(jsonPath("$.detail.status").value("COMPLETED"));
     }
@@ -158,13 +158,13 @@ class PaymentHistoryControllerTest {
     @DisplayName("결제 상세 조회 - 결제 내역 없음")
     void getPayment_NotFound() throws Exception {
         // given
-        Long paymentId = 999L;
+        Long historyId = 999L;
 
-        given(paymentHistoryService.getPayment(paymentId))
-                .willThrow(new PaymentNotFoundException("결제 내역을 찾을 수 없습니다: " + paymentId));
+        given(walletHistoryService.getPayment(historyId))
+                .willThrow(new PaymentNotFoundException("결제 내역을 찾을 수 없습니다: " + historyId));
 
         // when & then
-        mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId))
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", historyId))
                 .andExpect(status().isNotFound());
     }
 
@@ -172,13 +172,13 @@ class PaymentHistoryControllerTest {
     @DisplayName("결제 상세 조회 - 권한 없음")
     void getPayment_Forbidden() throws Exception {
         // given
-        Long paymentId = 1L;
+        Long historyId = 1L;
 
-        given(paymentHistoryService.getPayment(paymentId))
+        given(walletHistoryService.getPayment(historyId))
                 .willThrow(new ForbiddenException("해당 결제 내역에 접근할 권한이 없습니다"));
 
         // when & then
-        mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId))
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", historyId))
                 .andExpect(status().isForbidden());
     }
 }

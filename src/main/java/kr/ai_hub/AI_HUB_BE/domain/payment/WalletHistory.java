@@ -13,27 +13,27 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "payment_history", indexes = {
-        @Index(name = "idx_payment_transaction_id", columnList = "transaction_id"),
-        @Index(name = "idx_payment_user_created", columnList = "user_id, created_at"),
-        @Index(name = "idx_payment_user_status", columnList = "user_id, status"),
-        @Index(name = "idx_payment_status", columnList = "status"),
-        @Index(name = "idx_payment_created_at", columnList = "created_at")
+@Table(name = "wallet_history", indexes = {
+        @Index(name = "idx_wallet_transaction_id", columnList = "transaction_id"),
+        @Index(name = "idx_wallet_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_wallet_user_status", columnList = "user_id, status"),
+        @Index(name = "idx_wallet_status", columnList = "status"),
+        @Index(name = "idx_wallet_created_at", columnList = "created_at")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class PaymentHistory {
+public class WalletHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "payment_id")
-    private Long paymentId;
+    @Column(name = "history_id")
+    private Long historyId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_payment_history_user"))
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_wallet_history_user"))
     private User user;
 
     @Column(name = "transaction_id", length = 100, nullable = false, unique = true)

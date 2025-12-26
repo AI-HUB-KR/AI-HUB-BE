@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @Import(JpaAuditingConfig.class)
-class PaymentHistoryRepositoryTest {
+class WalletHistoryRepositoryTest {
 
     @Autowired
-    private PaymentHistoryRepository paymentHistoryRepository;
+    private WalletHistoryRepository walletHistoryRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -42,7 +42,7 @@ class PaymentHistoryRepositoryTest {
                 .build());
 
         String transactionId = UUID.randomUUID().toString();
-        PaymentHistory paymentHistory = PaymentHistory.builder()
+        WalletHistory walletHistory = WalletHistory.builder()
                 .user(user)
                 .transactionId(transactionId)
                 .paymentMethod("CARD")
@@ -50,10 +50,10 @@ class PaymentHistoryRepositoryTest {
                 .paidCoin(BigDecimal.valueOf(100))
                 .status("completed")
                 .build();
-        paymentHistoryRepository.save(paymentHistory);
+        walletHistoryRepository.save(walletHistory);
 
         // when
-        Optional<PaymentHistory> result = paymentHistoryRepository.findByTransactionId(transactionId);
+        Optional<WalletHistory> result = walletHistoryRepository.findByTransactionId(transactionId);
 
         // then
         assertThat(result).isPresent();
@@ -70,24 +70,24 @@ class PaymentHistoryRepositoryTest {
                 .role(UserRole.ROLE_USER)
                 .build());
 
-        PaymentHistory payment1 = PaymentHistory.builder()
+        WalletHistory history1 = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-1")
                 .paymentMethod("CARD")
                 .payAmountKrw(BigDecimal.valueOf(10000))
                 .paidCoin(BigDecimal.valueOf(100))
                 .build();
-        PaymentHistory payment2 = PaymentHistory.builder()
+        WalletHistory history2 = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-2")
                 .paymentMethod("CARD")
                 .payAmountKrw(BigDecimal.valueOf(20000))
                 .paidCoin(BigDecimal.valueOf(200))
                 .build();
-        paymentHistoryRepository.saveAll(List.of(payment1, payment2));
+        walletHistoryRepository.saveAll(List.of(history1, history2));
 
         // when
-        List<PaymentHistory> result = paymentHistoryRepository.findByUser(user);
+        List<WalletHistory> result = walletHistoryRepository.findByUser(user);
 
         // then
         assertThat(result).hasSize(2);
@@ -103,14 +103,14 @@ class PaymentHistoryRepositoryTest {
                 .role(UserRole.ROLE_USER)
                 .build());
 
-        PaymentHistory payment1 = PaymentHistory.builder()
+        WalletHistory history1 = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-old")
                 .paymentMethod("CARD")
                 .payAmountKrw(BigDecimal.valueOf(10000))
                 .paidCoin(BigDecimal.valueOf(100))
                 .build();
-        paymentHistoryRepository.save(payment1);
+        walletHistoryRepository.save(history1);
 
         // Force delay or different time (JPA auditing uses system time, so sequential
         // saves might have same timestamp)
@@ -119,17 +119,17 @@ class PaymentHistoryRepositoryTest {
         // Let's just save and hope for slight diff or rely on ID order if timestamp is
         // same (though method name implies CreatedAt)
 
-        PaymentHistory payment2 = PaymentHistory.builder()
+        WalletHistory history2 = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-new")
                 .paymentMethod("CARD")
                 .payAmountKrw(BigDecimal.valueOf(20000))
                 .paidCoin(BigDecimal.valueOf(200))
                 .build();
-        paymentHistoryRepository.save(payment2);
+        walletHistoryRepository.save(history2);
 
         // when
-        List<PaymentHistory> result = paymentHistoryRepository.findByUserOrderByCreatedAtDesc(user);
+        List<WalletHistory> result = walletHistoryRepository.findByUserOrderByCreatedAtDesc(user);
 
         // then
         assertThat(result).hasSize(2);
@@ -148,7 +148,7 @@ class PaymentHistoryRepositoryTest {
                 .role(UserRole.ROLE_USER)
                 .build());
 
-        PaymentHistory pending = PaymentHistory.builder()
+        WalletHistory pending = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-pending")
                 .paymentMethod("CARD")
@@ -156,7 +156,7 @@ class PaymentHistoryRepositoryTest {
                 .paidCoin(BigDecimal.valueOf(100))
                 .status("pending")
                 .build();
-        PaymentHistory completed = PaymentHistory.builder()
+        WalletHistory completed = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-completed")
                 .paymentMethod("CARD")
@@ -164,10 +164,10 @@ class PaymentHistoryRepositoryTest {
                 .paidCoin(BigDecimal.valueOf(100))
                 .status("completed")
                 .build();
-        paymentHistoryRepository.saveAll(List.of(pending, completed));
+        walletHistoryRepository.saveAll(List.of(pending, completed));
 
         // when
-        List<PaymentHistory> result = paymentHistoryRepository.findByStatus("completed");
+        List<WalletHistory> result = walletHistoryRepository.findByStatus("completed");
 
         // then
         assertThat(result).hasSize(1);
@@ -184,21 +184,21 @@ class PaymentHistoryRepositoryTest {
                 .role(UserRole.ROLE_USER)
                 .build());
 
-        PaymentHistory payment = PaymentHistory.builder()
+        WalletHistory history = WalletHistory.builder()
                 .user(user)
                 .transactionId("tx-time")
                 .paymentMethod("CARD")
                 .payAmountKrw(BigDecimal.valueOf(10000))
                 .paidCoin(BigDecimal.valueOf(100))
                 .build();
-        paymentHistoryRepository.save(payment);
+        walletHistoryRepository.save(history);
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime yesterday = now.minusDays(1);
         LocalDateTime tomorrow = now.plusDays(1);
 
         // when
-        List<PaymentHistory> result = paymentHistoryRepository.findByCreatedAtBetween(yesterday, tomorrow);
+        List<WalletHistory> result = walletHistoryRepository.findByCreatedAtBetween(yesterday, tomorrow);
 
         // then
         assertThat(result).hasSize(1);
@@ -215,7 +215,7 @@ class PaymentHistoryRepositoryTest {
                 .build());
 
         for (int i = 0; i < 10; i++) {
-            paymentHistoryRepository.save(PaymentHistory.builder()
+            walletHistoryRepository.save(WalletHistory.builder()
                     .user(user)
                     .transactionId("tx-" + i)
                     .paymentMethod("CARD")
@@ -227,7 +227,7 @@ class PaymentHistoryRepositoryTest {
         Pageable pageable = PageRequest.of(0, 5);
 
         // when
-        Page<PaymentHistory> result = paymentHistoryRepository.findByUser(user, pageable);
+        Page<WalletHistory> result = walletHistoryRepository.findByUser(user, pageable);
 
         // then
         assertThat(result.getContent()).hasSize(5);

@@ -1,6 +1,6 @@
 package kr.ai_hub.AI_HUB_BE.application.payment.dto;
 
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistory;
 import lombok.Builder;
 
 import java.math.BigDecimal;
@@ -13,7 +13,7 @@ import java.util.Map;
  */
 @Builder
 public record PaymentResponse(
-        Long paymentId,
+        Long historyId,
         String transactionId,
         String paymentMethod,
         BigDecimal payAmountKrw,
@@ -26,21 +26,21 @@ public record PaymentResponse(
         Instant createdAt,
         Instant completedAt
 ) {
-    public static PaymentResponse from(PaymentHistory payment) {
+    public static PaymentResponse from(WalletHistory history) {
         return PaymentResponse.builder()
-                .paymentId(payment.getPaymentId())
-                .transactionId(payment.getTransactionId())
-                .paymentMethod(payment.getPaymentMethod())
-                .payAmountKrw(payment.getPayAmountKrw())
-                .payAmountUsd(payment.getPayAmountUsd())
-                .paidCoin(payment.getPaidCoin())
-                .promotionCoin(payment.getPromotionCoin())
-                .status(payment.getStatus())
-                .paymentGateway(payment.getPaymentGateway())
-                .metadata(payment.getMetadata())
-                .createdAt(payment.getCreatedAt().toInstant(ZoneOffset.UTC))
-                .completedAt(payment.getCompletedAt() != null ?
-                        payment.getCompletedAt().toInstant(ZoneOffset.UTC) : null)
+                .historyId(history.getHistoryId())
+                .transactionId(history.getTransactionId())
+                .paymentMethod(history.getPaymentMethod())
+                .payAmountKrw(history.getPayAmountKrw())
+                .payAmountUsd(history.getPayAmountUsd())
+                .paidCoin(history.getPaidCoin())
+                .promotionCoin(history.getPromotionCoin())
+                .status(history.getStatus())
+                .paymentGateway(history.getPaymentGateway())
+                .metadata(history.getMetadata())
+                .createdAt(history.getCreatedAt().toInstant(ZoneOffset.UTC))
+                .completedAt(history.getCompletedAt() != null ?
+                        history.getCompletedAt().toInstant(ZoneOffset.UTC) : null)
                 .build();
     }
 }

@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.payment;
 
 import kr.ai_hub.AI_HUB_BE.application.payment.dto.PaymentResponse;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistory;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistoryRepository;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryRepository;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
 import kr.ai_hub.AI_HUB_BE.global.auth.SecurityContextHelper;
@@ -20,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class PaymentHistoryService {
+public class WalletHistoryService {
 
-    private final PaymentHistoryRepository paymentHistoryRepository;
+    private final WalletHistoryRepository walletHistoryRepository;
     private final UserRepository userRepository;
     private final SecurityContextHelper securityContextHelper;
 
@@ -37,11 +37,11 @@ public class PaymentHistoryService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
 
-        Page<PaymentHistory> payments;
+        Page<WalletHistory> payments;
         if (status != null && !status.isBlank()) {
-            payments = paymentHistoryRepository.findByUserAndStatus(user, status, pageable);
+            payments = walletHistoryRepository.findByUserAndStatus(user, status, pageable);
         } else {
-            payments = paymentHistoryRepository.findByUser(user, pageable);
+            payments = walletHistoryRepository.findByUser(user, pageable);
         }
 
         return payments.map(PaymentResponse::from);
@@ -54,7 +54,7 @@ public class PaymentHistoryService {
         Integer userId = securityContextHelper.getCurrentUserId();
         log.debug("결제 {} 상세 조회 by 사용자 {}", paymentId, userId);
 
-        PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
+        WalletHistory payment = walletHistoryRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException("결제 내역을 찾을 수 없습니다: " + paymentId));
 
         // 권한 확인: 결제 소유자만 조회 가능

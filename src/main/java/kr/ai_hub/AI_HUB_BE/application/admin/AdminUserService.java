@@ -1,7 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.admin;
 
 import kr.ai_hub.AI_HUB_BE.controller.admin.dto.UserListResponse;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryRepository;
 import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryType;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 public class AdminUserService {
     private final UserRepository userRepository;
     private final UserWalletRepository userWalletRepository;
-    private final kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistoryRepository paymentHistoryRepository;
+    private final WalletHistoryRepository walletHistoryRepository;
 
     /**
      * 사용자 권한을 수정합니다 (관리자 전용)
@@ -91,7 +92,7 @@ public class AdminUserService {
 
     /**
      * 사용자 프로모션 코인 잔액을 수정합니다 (관리자 전용)
-     * PaymentHistory(wallet_history)에 변경 이력을 기록합니다.
+     * WalletHistory(wallet_history)에 변경 이력을 기록합니다.
      *
      * @param userId            잔액을 수정할 사용자 ID
      * @param promotionChange   프로모션 코인 변경량 (양수: 증가, 음수: 감소)
@@ -139,7 +140,7 @@ public class AdminUserService {
             wallet.deductPromotionBalance(promotionChange.abs());  // 감소
         }
 
-        // PaymentHistory(wallet_history) 기록 생성
+        // WalletHistory 기록 생성
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("adminId", currentAdminId);
         metadata.put("userId", userId);
@@ -147,7 +148,7 @@ public class AdminUserService {
 
         String transactionId = "admin_promo_" + UUID.randomUUID().toString();
 
-        PaymentHistory paymentHistory = PaymentHistory.builder()
+        WalletHistory walletHistory = WalletHistory.builder()
                 .user(wallet.getUser())
                 .transactionId(transactionId)
                 .paymentMethod("ADMIN_MODIFY")
@@ -161,7 +162,7 @@ public class AdminUserService {
                 .metadata(metadata)
                 .build();
 
-        paymentHistoryRepository.save(paymentHistory);
+        walletHistoryRepository.save(walletHistory);
 
         log.info("프로모션 코인 수정 완료 - userId: {}, 이전: {}, 현재: {}, historyType: {}",
                 userId, currentPromotionBalance, wallet.getPromotionBalance(), historyType);

@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.application.admin;
 
 import kr.ai_hub.AI_HUB_BE.controller.admin.dto.UserListResponse;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistory;
-import kr.ai_hub.AI_HUB_BE.domain.payment.PaymentHistoryRepository;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistory;
+import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryRepository;
 import kr.ai_hub.AI_HUB_BE.domain.payment.WalletHistoryType;
 import kr.ai_hub.AI_HUB_BE.domain.user.User;
 import kr.ai_hub.AI_HUB_BE.domain.user.UserRepository;
@@ -43,7 +43,7 @@ class AdminUserServiceTest {
     private UserWalletRepository userWalletRepository;
 
     @Mock
-    private PaymentHistoryRepository paymentHistoryRepository;
+    private WalletHistoryRepository walletHistoryRepository;
 
     @Test
     @DisplayName("사용자 권한 수정 - 성공")
@@ -193,7 +193,7 @@ class AdminUserServiceTest {
 
         given(userWalletRepository.findByUserUserId(userId)).willReturn(Optional.of(wallet));
 
-        ArgumentCaptor<PaymentHistory> historyCaptor = ArgumentCaptor.forClass(PaymentHistory.class);
+        ArgumentCaptor<WalletHistory> historyCaptor = ArgumentCaptor.forClass(WalletHistory.class);
 
         // when
         adminUserService.modifyPromotionBalance(userId, promotionChange, adminId);
@@ -202,10 +202,10 @@ class AdminUserServiceTest {
         assertThat(wallet.getPromotionBalance()).isEqualByComparingTo(BigDecimal.valueOf(100));
         assertThat(wallet.getBalance()).isEqualByComparingTo(BigDecimal.valueOf(100));
         verify(userWalletRepository).findByUserUserId(userId);
-        verify(paymentHistoryRepository).save(historyCaptor.capture());
+        verify(walletHistoryRepository).save(historyCaptor.capture());
 
-        // PaymentHistory 검증
-        PaymentHistory savedHistory = historyCaptor.getValue();
+        // WalletHistory 검증
+        WalletHistory savedHistory = historyCaptor.getValue();
         assertThat(savedHistory.getWalletHistoryType()).isEqualTo(WalletHistoryType.PROMOTION);
         assertThat(savedHistory.getPromotionCoin()).isEqualByComparingTo(BigDecimal.valueOf(100));
     }
@@ -236,7 +236,7 @@ class AdminUserServiceTest {
 
         given(userWalletRepository.findByUserUserId(userId)).willReturn(Optional.of(wallet));
 
-        ArgumentCaptor<PaymentHistory> historyCaptor = ArgumentCaptor.forClass(PaymentHistory.class);
+        ArgumentCaptor<WalletHistory> historyCaptor = ArgumentCaptor.forClass(WalletHistory.class);
 
         // when
         adminUserService.modifyPromotionBalance(userId, promotionChange, adminId);
@@ -245,10 +245,10 @@ class AdminUserServiceTest {
         assertThat(wallet.getPromotionBalance()).isEqualByComparingTo(BigDecimal.valueOf(50));
         assertThat(wallet.getBalance()).isEqualByComparingTo(BigDecimal.valueOf(50));
         verify(userWalletRepository).findByUserUserId(userId);
-        verify(paymentHistoryRepository).save(historyCaptor.capture());
+        verify(walletHistoryRepository).save(historyCaptor.capture());
 
-        // PaymentHistory 검증
-        PaymentHistory savedHistory = historyCaptor.getValue();
+        // WalletHistory 검증
+        WalletHistory savedHistory = historyCaptor.getValue();
         assertThat(savedHistory.getWalletHistoryType()).isEqualTo(WalletHistoryType.PROMOTION_RETRIEVE);
         assertThat(savedHistory.getPromotionCoin()).isEqualByComparingTo(BigDecimal.valueOf(50));  // 절댓값으로 저장됨
     }
@@ -266,7 +266,7 @@ class AdminUserServiceTest {
 
         // then
         verify(userWalletRepository, org.mockito.Mockito.never()).findByUserUserId(any());
-        verify(paymentHistoryRepository, org.mockito.Mockito.never()).save(any());
+        verify(walletHistoryRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
