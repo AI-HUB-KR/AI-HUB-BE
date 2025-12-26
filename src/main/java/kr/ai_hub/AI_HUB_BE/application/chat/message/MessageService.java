@@ -151,6 +151,11 @@ public class MessageService {
             log.error("스트림 변환 실패: {}", e.getMessage(), e);
             handleMessageError(userMessage, new AIServerException("스트림 처리 중 오류가 발생했습니다", e), emitter);
 
+        } catch (BaseException e) {
+            // 비즈니스 예외 (코인 부족, 권한 없음 등)
+            log.warn("비즈니스 예외 발생: {}", e.getMessage());
+            handleBusinessError(userMessage, e, emitter);
+
         } catch (Exception e) {
             // 예상치 못한 에러
             log.error("예상치 못한 에러: {}", e.getMessage(), e);
@@ -176,6 +181,37 @@ public class MessageService {
         }
 
         emitter.completeWithError(error);
+    }
+
+    /**
+     * 비즈니스 예외 발생 시 에러를 처리합니다.
+     * User 메시지는 삭제하지 않고 유지합니다.
+     */
+    private void handleBusinessError(Message userMessage, BaseException error, SseEmitter emitter) {
+        try {
+            // 에러 정보를 SSE 이벤트로 전송
+            Map<String, Object> errorResponse = Map.of(
+                    "error", true,
+                    "errorCode", error.getErrorCode().name(),
+                    "message", error.getMessage()
+            );
+
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(errorResponse));
+
+            // User 메시지는 삭제하지 않고 유지 (비즈니스 예외이므로)
+            if (userMessage != null) {
+                log.info("비즈니스 예외로 인한 실패, User 메시지 유지: messageId={}", userMessage.getMessageId());
+            }
+
+            // 정상 종료 (에러 응답을 보낸 후)
+            emitter.complete();
+
+        } catch (IOException ioException) {
+            log.error("비즈니스 에러 응답 전송 실패: {}", ioException.getMessage(), ioException);
+            emitter.completeWithError(error);
+        }
     }
 
     /**

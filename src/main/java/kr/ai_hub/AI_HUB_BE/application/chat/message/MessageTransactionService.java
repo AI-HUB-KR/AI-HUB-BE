@@ -130,7 +130,7 @@ public class MessageTransactionService {
                 .chatRoom(managedChatRoom)
                 .message(assistantMessage)
                 .transactionType("AI_USAGE")
-                .amount(totalCoin.negate()) // 차감이므로 음수
+                .coinUsage(totalCoin.negate()) // 차감이므로 음수
                 .balanceAfter(wallet.getBalance())
                 .description(String.format("AI 모델 사용: %s (입력: %d토큰, 출력: %d토큰)",
                         aiModel.getModelName(), usage.inputTokens(), usage.outputTokens()))

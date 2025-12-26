@@ -81,7 +81,7 @@ public class DashboardService {
 
         // 전체 코인 사용량 계산 (음수이므로 절댓값)
         BigDecimal totalCoinUsed = usageTransactions.stream()
-                .map(CoinTransaction::getAmount)
+                .map(CoinTransaction::getCoinUsage)
                 .map(BigDecimal::abs)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -96,14 +96,14 @@ public class DashboardService {
                     List<CoinTransaction> modelTransactions = entry.getValue();
 
                     BigDecimal coinUsed = modelTransactions.stream()
-                            .map(CoinTransaction::getAmount)
+                            .map(CoinTransaction::getCoinUsage)
                             .map(BigDecimal::abs)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                     long messageCount = modelTransactions.size();
 
                     BigDecimal tokenCount = modelTransactions.stream()
-                            .map(CoinTransaction::getAmount)
+                            .map(CoinTransaction::getCoinUsage)
                             .map(BigDecimal::abs)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -136,7 +136,7 @@ public class DashboardService {
                     List<CoinTransaction> dayTransactions = entry.getValue();
 
                     BigDecimal coinUsed = dayTransactions.stream()
-                            .map(CoinTransaction::getAmount)
+                            .map(CoinTransaction::getCoinUsage)
                             .map(BigDecimal::abs)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -189,7 +189,7 @@ public class DashboardService {
                     .collect(Collectors.groupingBy(
                             CoinTransaction::getAiModel,
                             Collectors.reducing(BigDecimal.ZERO,
-                                    t -> t.getAmount().abs(),
+                                    t -> t.getCoinUsage().abs(),
                                     BigDecimal::add)
                     ));
 
@@ -225,7 +225,7 @@ public class DashboardService {
 
         BigDecimal last30DaysUsage = last30DaysTransactions.stream()
                 .filter(t -> "usage".equalsIgnoreCase(t.getTransactionType()))
-                .map(CoinTransaction::getAmount)
+                .map(CoinTransaction::getCoinUsage)
                 .map(BigDecimal::abs)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
