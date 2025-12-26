@@ -16,10 +16,10 @@ public record PaymentResponse(
         Long paymentId,
         String transactionId,
         String paymentMethod,
-        BigDecimal amountKrw,
-        BigDecimal amountUsd,
-        BigDecimal coinAmount,
-        BigDecimal bonusCoin,
+        BigDecimal payAmountKrw,
+        BigDecimal payAmountUsd,
+        BigDecimal paidCoin,
+        BigDecimal promotionCoin,
         String status,
         String paymentGateway,
         Map<String, Object> metadata,
@@ -31,10 +31,10 @@ public record PaymentResponse(
                 .paymentId(payment.getPaymentId())
                 .transactionId(payment.getTransactionId())
                 .paymentMethod(payment.getPaymentMethod())
-                .amountKrw(payment.getAmountKrw())
-                .amountUsd(payment.getAmountUsd())
-                .coinAmount(payment.getCoinAmount())
-                .bonusCoin(payment.getBonusCoin())
+                .payAmountKrw(payment.getPayAmountKrw())
+                .payAmountUsd(payment.getPayAmountUsd())
+                .paidCoin(payment.getPaidCoin())
+                .promotionCoin(payment.getPromotionCoin())
                 .status(payment.getStatus())
                 .paymentGateway(payment.getPaymentGateway())
                 .metadata(payment.getMetadata())
