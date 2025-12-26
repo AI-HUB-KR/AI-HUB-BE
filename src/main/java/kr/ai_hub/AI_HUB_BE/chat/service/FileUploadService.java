@@ -13,13 +13,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,9 +58,15 @@ public class FileUploadService {
         log.debug("AI 모델 조회 성공: modelName={}", aiModel.getModelName());
 
         try {
-            MultipartBodyBuilder builder = new MultipartBodyBuilder();
-            builder.part("file", file.getResource());
-            MultiValueMap<String, HttpEntity<?>> multipartBody = builder.build();
+            // Servlet 방식으로 multipart 요청 생성
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return file.getOriginalFilename();
+                }
+            };
+            body.add("file", resource);
 
             AiServerResponse<AiUploadData> response = aiServerUploadClient.post()
                     .uri(uriBuilder -> uriBuilder
@@ -66,7 +74,7 @@ public class FileUploadService {
                             .queryParam("model", aiModel.getModelName())
                             .build())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(multipartBody)
+                    .body(body)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (request, clientResponse) -> {
                         String errorMessage = resolveErrorMessage(clientResponse);
@@ -87,11 +95,13 @@ public class FileUploadService {
 
             return FileUploadResponse.of(fileId);
 
+        } catch (AIServerException e) {
+            throw e;
+        } catch (IOException e) {
+            log.error("파일 읽기 중 에러 발생: {}", e.getMessage(), e);
+            throw new AIServerException("파일을 읽는 중 에러가 발생했습니다: " + e.getMessage(), e);
         } catch (Exception e) {
             log.error("파일 업로드 중 에러 발생: {}", e.getMessage(), e);
-            if (e instanceof AIServerException) {
-                throw e;
-            }
             throw new AIServerException("파일 업로드 중 에러가 발생했습니다: " + e.getMessage(), e);
         }
     }
