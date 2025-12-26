@@ -1,7 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.global.application;
 
 import jakarta.servlet.http.Cookie;
-import kr.ai_hub.AI_HUB_BE.domain.user.User;
+import kr.ai_hub.AI_HUB_BE.global.common.CookieService;
+import kr.ai_hub.AI_HUB_BE.user.domain.User;
 import kr.ai_hub.AI_HUB_BE.global.error.exception.InvalidTokenException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

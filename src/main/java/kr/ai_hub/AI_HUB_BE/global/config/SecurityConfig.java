@@ -1,8 +1,8 @@
 package kr.ai_hub.AI_HUB_BE.global.config;
 
-import kr.ai_hub.AI_HUB_BE.application.auth.CustomOAuth2UserService;
-import kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtAuthenticationEntryPoint;
-import kr.ai_hub.AI_HUB_BE.global.auth.jwt.JwtAuthenticationFilter;
+import kr.ai_hub.AI_HUB_BE.auth.service.CustomOAuth2UserService;
+import kr.ai_hub.AI_HUB_BE.global.security.jwt.JwtAuthenticationEntryPoint;
+import kr.ai_hub.AI_HUB_BE.global.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

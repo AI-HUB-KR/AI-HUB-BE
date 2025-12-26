@@ -1,4 +1,0 @@
-package kr.ai_hub.AI_HUB_BE.application.auth.dto;
-
-public record TokenRefreshResponse(String accessToken, long expiresIn) {
-}
