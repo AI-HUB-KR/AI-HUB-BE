@@ -1,5 +1,10 @@
 ## 아키텍처 참고사항
 
+- **패키지 구조**: 도메인 중심 아키텍처(Domain-Driven Design) 적용
+  - 패키지 전략: Package by Feature (도메인별 계층화)
+  - 구조: `{domain}/{controller|service|domain|dto}`
+  - 예시: `kr.ai_hub.AI_HUB_BE.chat.service.MessageService`
+  - 7개 주요 도메인: user, aimodel, auth, wallet, chat, admin, dashboard
 - **패키지 네이밍**: Java 패키지명에는 하이픈이 아닌 언더스코어(`kr.ai_hub.AI_HUB_BE`)를 항상 사용해야 합니다
 - **메인 애플리케이션**: 진입점은 표준 `@SpringBootApplication` 어노테이션이 적용된 `AiHubBeApplication.java`입니다
 - **엔티티 설계**: JPA 엔티티 클래스 작성 시 위의 데이터베이스 구조를 정확히 따라야 합니다
@@ -11,10 +16,13 @@
   - `@Async` 어노테이션 사용 금지 (Virtual Threads가 자동으로 처리)
   - 동기 방식 코드 작성 (Virtual Threads가 I/O 블로킹 자동 처리)
   - 블로킹 I/O 작업을 평범한 동기 코드로 작성 (예: `RestClient.exchange()` + `InputStream`)
+  - Tomcat의 Virtual Threads는 SecurityContext를 자동으로 전파
+  - 수동으로 생성한 Virtual Thread는 SecurityContext를 명시적으로 설정해야 함
 - **외부 MSA 통신**: AI 서버와의 통신은 RestClient를 사용합니다
-  - RestClient는 동기식 HTTP 클라이언트로만 사용
+  - RestClient는 동기식 HTTP 클라이언트로만 사용 (WebFlux 사용 안 함)
   - `global/config/RestClientConfig.java`에서 설정 관리
   - SSE(Server-Sent Events) 스트리밍 지원
+  - Multipart 전송은 Servlet 방식 사용 (`LinkedMultiValueMap` + `ByteArrayResource`)
 - Response 및 Error 클래스들은 from 및 builder 패턴을 활용하여 일관된 생성 방식을 유지합니다
 - 추가적인 패키지나 디렉토리가 필요할 경우 `convention.md`에 명시된 구조를 참고하여 일관성 있게 확장합니다
 
