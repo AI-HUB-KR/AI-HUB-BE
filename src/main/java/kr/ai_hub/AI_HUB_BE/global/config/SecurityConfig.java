@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,6 +19,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -32,25 +35,31 @@ import java.util.List;
 public class SecurityConfig {
 
     /**
-     * 인증 없이 접근 가능한 공개 엔드포인트
+     * 모든 프로필에서 공통으로 허용되는 엔드포인트
      */
-    private static final String[] PUBLIC_ENDPOINTS = {
-            "/h2-console/**",           // H2 데이터베이스 콘솔
+    private static final String[] COMMON_PUBLIC_ENDPOINTS = {
             "/login",                   // 로그인 페이지
             "/oauth2/**",               // OAuth2 로그인 엔드포인트
-            "/ws/info/**",              // WebSocket 정보
             "/api/v1/token/refresh",    // 토큰 갱신 API
+            "/favicon.ico",             // 파비콘
+            "/actuator/**"              // Spring Actuator
+    };
+
+    /**
+     * dev 프로필에서만 추가로 허용되는 엔드포인트
+     */
+    private static final String[] DEV_ONLY_ENDPOINTS = {
+            "/h2-console/**",           // H2 데이터베이스 콘솔
             "/v3/api-docs/**",          // OpenAPI 문서
             "/swagger-ui/**",           // Swagger UI
-            "/swagger-ui.html",
-            "/favicon.ico",
-            "/actuator/**"              // Spring Actuator
+            "/swagger-ui.html"          // Swagger UI 메인
     };
 
     private static final String KAKAO_LOGIN_PAGE = "/oauth2/authorization/kakao";
     private static final String CORS_PATH_PATTERN = "/**";
     private static final List<String> EXPOSED_HEADERS = List.of("Authorization");
 
+    private final Environment environment;
     private final CustomOAuth2UserService oAuth2UserService;
     private final AuthenticationSuccessHandler oAuth2SuccessHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -64,21 +73,26 @@ public class SecurityConfig {
 
     /**
      * Spring Security 필터 체인 설정
+     * - dev 프로필: H2 콘솔, Swagger UI 허용
+     * - prod 프로필: 보안 강화 (개발 도구 차단)
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // 프로필별 허용 엔드포인트 동적 생성
+        String[] publicEndpoints = getPublicEndpoints();
+
         return http
                 // CSRF 비활성화 (JWT 사용으로 불필요)
                 .csrf(csrf -> csrf.disable())
                 // CORS 설정 활성화
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // H2 Console iframe 허용
+                // H2 Console iframe 허용 (dev 프로필에서만 의미 있음)
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
                 // 세션 미사용 (JWT 기반 STATELESS)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 경로별 인증 규칙
+                // 경로별 인증 규칙 (프로필별 동적 적용)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(publicEndpoints).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, CORS_PATH_PATTERN).permitAll() // CORS Preflight
                         .anyRequest().authenticated()
                 )
@@ -96,9 +110,25 @@ public class SecurityConfig {
     }
 
     /**
+     * 프로필별 허용 엔드포인트 동적 생성
+     * - dev: 공통 + 개발 도구 (H2, Swagger)
+     * - prod: 공통만 허용
+     */
+    private String[] getPublicEndpoints() {
+        List<String> endpoints = new ArrayList<>(Arrays.asList(COMMON_PUBLIC_ENDPOINTS));
+
+        // dev 프로필일 때만 개발 도구 엔드포인트 추가
+        if (Arrays.asList(environment.getActiveProfiles()).contains("dev")) {
+            endpoints.addAll(Arrays.asList(DEV_ONLY_ENDPOINTS));
+        }
+
+        return endpoints.toArray(new String[0]);
+    }
+
+    /**
      * CORS 설정
      * - 프로필별 허용 출처 설정 (application.yaml에서 관리)
-     * - 모든 HTTP 메서드 및 헤더 허용
+     * - 프로젝트에서 실제 사용하는 메서드와 헤더만 명시적으로 허용
      * - 쿠키 포함 요청 허용 (credentials: include)
      */
     @Bean
@@ -110,8 +140,25 @@ public class SecurityConfig {
             configuration.addAllowedOrigin(origin.trim());
         }
 
-        configuration.addAllowedMethod("*");        // 모든 HTTP 메서드 허용
-        configuration.addAllowedHeader("*");        // 모든 헤더 허용
+        // 실제 사용하는 HTTP 메서드만 명시적으로 허용
+        configuration.setAllowedMethods(List.of(
+                "GET",      // 조회
+                "POST",     // 생성, 로그인, 메시지 전송
+                "PUT",      // 전체 수정
+                "PATCH",    // 부분 수정
+                "DELETE",   // 삭제
+                "OPTIONS"   // CORS Preflight
+        ));
+
+        // 실제 사용하는 헤더만 명시적으로 허용
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",    // JWT 토큰
+                "Content-Type",     // application/json, multipart/form-data, text/event-stream
+                "Accept",           // 응답 타입 지정
+                "Origin",           // CORS 출처
+                "X-Requested-With"  // AJAX 요청 식별
+        ));
+
         configuration.setAllowCredentials(true);    // 쿠키 포함 요청 허용
         configuration.setExposedHeaders(EXPOSED_HEADERS); // Authorization 헤더 노출
 
